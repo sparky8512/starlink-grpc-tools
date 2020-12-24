@@ -25,7 +25,7 @@ from itertools import chain
 fArgError = False
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "ahs:vH")
+    opts, args = getopt.getopt(sys.argv[1:], "ahrs:vH")
 except getopt.GetoptError as err:
     print(str(err))
     fArgError = True
@@ -36,6 +36,7 @@ fUsage = False
 fVerbose = False
 fParseAll = False
 fHeader = False
+fRunLengths = False
 
 if not fArgError:
     if len(args) > 0:
@@ -46,6 +47,8 @@ if not fArgError:
                 fParseAll = True
             elif opt == "-h":
                 fUsage = True
+            elif opt == "-r":
+                fRunLengths = True
             elif opt == "-s":
                 parseSamples = int(arg)
             elif opt == "-v":
@@ -58,18 +61,28 @@ if fUsage or fArgError:
     print("Options:")
     print("    -a: Parse all valid samples")
     print("    -h: Be helpful")
+    print("    -r: Include ping drop run length stats")
     print("    -s <num>: Parse <num> data samples, default: "+str(parseSamples))
     print("    -v: Be verbose")
     print("    -H: print CSV header instead of parsing file")
     sys.exit(1 if fArgError else 0)
 
 if fHeader:
-    print("datetimestamp_utc,samples,total_ping_drop,count_full_ping_drop,count_obstructed,total_obstructed_ping_drop,count_full_obstructed_ping_drop,count_unscheduled,total_unscheduled_ping_drop,count_full_unscheduled_ping_drop")
+    header = "datetimestamp_utc,samples,total_ping_drop,count_full_ping_drop,count_obstructed,total_obstructed_ping_drop,count_full_obstructed_ping_drop,count_unscheduled,total_unscheduled_ping_drop,count_full_unscheduled_ping_drop"
+    if fRunLengths:
+        header+= ",init_run_fragment,final_run_fragment,"
+        header += ",".join("run_seconds_" + str(x) for x in range(1, 61)) + ","
+        header += ",".join("run_minutes_" + str(x) for x in range(1, 60))
+        header += ",run_minutes_60_or_greater"
+    print(header)
     sys.exit(0)
 
 with grpc.insecure_channel('192.168.100.1:9200') as channel:
     stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
     response = stub.Handle(spacex.api.device.device_pb2.Request(get_history={}))
+
+timestamp = datetime.datetime.utcnow()
+
 historyData = response.dish_get_history
 
 # 'current' is the count of data samples written to the ring buffer,
@@ -99,6 +112,11 @@ totObstruct = 0
 totObstructD = 0
 totObstructOne = 0
 
+secondRuns = [0] * 60
+minuteRuns = [0] * 60
+runLength = 0
+initRun = None
+
 if fParseAll or nSamples < parseSamples:
     parseSamples = nSamples
 
@@ -115,6 +133,18 @@ for i in sampleRange:
     tot += d
     if d >= 1:
         totOne += d
+        runLength += 1
+    elif runLength > 0:
+        if initRun is None:
+            initRun = runLength
+        else:
+            if runLength <= 60:
+                secondRuns[runLength-1] += runLength
+            else:
+                minuteRuns[min((runLength-1)//60-1, 59)] += runLength
+        runLength = 0
+    elif initRun is None:
+        initRun = 0
     if not historyData.scheduled[i]:
         totUnsched += 1
         totUnschedD += d
@@ -126,6 +156,14 @@ for i in sampleRange:
         if d >= 1:
             totObstructOne += d
 
+# If the entire sample set is one big drop run, it will be both initial
+# fragment (continued from prior sample range) and final one (continued
+# to next sample range), but to avoid double-reporting, just call it
+# the initial run.
+if initRun is None:
+    initRun = runLength
+    runLength = 0
+
 if fVerbose:
     print("Parsed samples:        " + str(parseSamples))
     print("Total ping drop:       " + str(tot))
@@ -136,6 +174,14 @@ if fVerbose:
     print("Unscheduled:           " + str(totUnsched))
     print("Unscheduled ping drop: " + str(totUnschedD))
     print("Unscheduled drop == 1: " + str(totUnschedOne))
+    if fRunLengths:
+        print("Initial drop run fragment: " + str(initRun))
+        print("Final drop run fragment: " + str(runLength))
+        print("Per-second drop runs:  " + ", ".join(str(x) for x in secondRuns))
+        print("Per-minute drop runs:  " + ", ".join(str(x) for x in minuteRuns))
 else:
     # NOTE: When changing data output format, also change the -H header printing above.
-    print(datetime.datetime.utcnow().replace(microsecond=0).isoformat()+","+str(parseSamples)+","+str(tot)+","+str(totOne)+","+str(totObstruct)+","+str(totObstructD)+","+str(totObstructOne)+","+str(totUnsched)+","+str(totUnschedD)+","+str(totUnschedOne))
+    csvData = timestamp.replace(microsecond=0).isoformat() + "," + ",".join(str(x) for x in [parseSamples, tot, totOne, totObstruct, totObstructD, totObstructOne, totUnsched, totUnschedD, totUnschedOne])
+    if fRunLengths:
+        csvData += "," + ",".join(str(x) for x in chain([initRun, runLength], secondRuns, minuteRuns))
+    print(csvData)
