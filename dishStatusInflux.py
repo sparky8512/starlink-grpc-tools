@@ -1,4 +1,12 @@
 #!/usr/bin/python3
+######################################################################
+#
+# Write get_status info to an InfluxDB database.
+#
+# This script will periodically poll current status and write it to
+# the specified InfluxDB database in a loop.
+#
+######################################################################
 from influxdb import InfluxDBClient
 from influxdb import SeriesHelper
 

@@ -1,4 +1,12 @@
 #!/usr/bin/python3
+######################################################################
+#
+# Publish get_status info to a MQTT broker.
+#
+# This script pulls the current status once and publishes it to the
+# specified MQTT broker.
+#
+######################################################################
 import paho.mqtt.publish
 
 import grpc
