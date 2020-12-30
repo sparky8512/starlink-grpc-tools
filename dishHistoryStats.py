@@ -150,7 +150,10 @@ for i in sampleRange:
         totUnschedD += d
         if d >= 1:
             totUnschedOne += d
-    if historyData.obstructed[i]:
+    # scheduled=false and obstructed=true do not ever appear to overlap,
+    # but in case they do in the future, treat that as just unscheduled
+    # in order to avoid double-counting it.
+    elif historyData.obstructed[i]:
         totObstruct += 1
         totObstructD += d
         if d >= 1:
