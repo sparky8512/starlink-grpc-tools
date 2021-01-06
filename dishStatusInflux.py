@@ -7,6 +7,8 @@
 # the specified InfluxDB database in a loop.
 #
 ######################################################################
+import time
+
 from influxdb import InfluxDBClient
 from influxdb import SeriesHelper
 
@@ -15,10 +17,8 @@ import grpc
 import spacex.api.device.device_pb2
 import spacex.api.device.device_pb2_grpc
 
-import time
-
-fVerbose = True
-sleepTime = 30
+verbose = True
+sleep_time = 30
 
 class DeviceStatusSeries(SeriesHelper):
     class Meta:
@@ -41,20 +41,20 @@ class DeviceStatusSeries(SeriesHelper):
             "fraction_obstructed"]
         tags = ["id"]
 
-influxClient = InfluxDBClient(host="localhost", port=8086, username="script-user", password="password", database="dishstats", ssl=False, retries=1, timeout=15)
+influx_client = InfluxDBClient(host="localhost", port=8086, username="script-user", password="password", database="dishstats", ssl=False, retries=1, timeout=15)
 
 try:
-    dishChannel = None
-    lastId = None
-    fLastFailed = False
+    dish_channel = None
+    last_id = None
+    last_failed = False
 
     pending = 0
     count = 0
     while True:
         try:
-            if dishChannel is None:
-                dishChannel = grpc.insecure_channel("192.168.100.1:9200")
-            stub = spacex.api.device.device_pb2_grpc.DeviceStub(dishChannel)
+            if dish_channel is None:
+                dish_channel = grpc.insecure_channel("192.168.100.1:9200")
+            stub = spacex.api.device.device_pb2_grpc.DeviceStub(dish_channel)
             response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
             status = response.dish_get_status
             DeviceStatusSeries(
@@ -74,45 +74,45 @@ try:
                 pop_ping_latency_ms=status.pop_ping_latency_ms,
                 currently_obstructed=status.obstruction_stats.currently_obstructed,
                 fraction_obstructed=status.obstruction_stats.fraction_obstructed)
-            lastId = status.device_info.id
-            fLastFailed = False
-        except Exception as e:
-            if not dishChannel is None:
-                dishChannel.close()
-                dishChannel = None
-            if fLastFailed:
-                if not lastId is None:
-                    DeviceStatusSeries(id=lastId, state="DISH_UNREACHABLE")
+            last_id = status.device_info.id
+            last_failed = False
+        except grpc.RpcError:
+            if dish_channel is not None:
+                dish_channel.close()
+                dish_channel = None
+            if last_failed:
+                if last_id is not None:
+                    DeviceStatusSeries(id=last_id, state="DISH_UNREACHABLE")
             else:
                 # Retry once, because the connection may have been lost while
                 # we were sleeping
-                fLastFailed = True
+                last_failed = True
                 continue
         pending = pending + 1
-        if fVerbose:
+        if verbose:
             print("Samples: " + str(pending))
         count = count + 1
         if count > 5:
             try:
-                DeviceStatusSeries.commit(influxClient)
-                if fVerbose:
+                DeviceStatusSeries.commit(influx_client)
+                if verbose:
                     print("Wrote " + str(pending))
                 pending = 0
             except Exception as e:
                 print("Failed to write: " + str(e))
             count = 0
-        if sleepTime > 0:
-            time.sleep(sleepTime)
+        if sleep_time > 0:
+            time.sleep(sleep_time)
         else:
             break
 finally:
     # Flush on error/exit
     try:
-        DeviceStatusSeries.commit(influxClient)
-        if fVerbose:
+        DeviceStatusSeries.commit(influx_client)
+        if verbose:
             print("Wrote " + str(pending))
     except Exception as e:
         print("Failed to write: " + str(e))
-    influxClient.close()
-    if not dishChannel is None:
-        dishChannel.close()
+    influx_client.close()
+    if dish_channel is not None:
+        dish_channel.close()
