@@ -37,6 +37,6 @@ python3 -m grpc_tools.protoc --descriptor_set_in=dish.protoset --python_out=. --
 python3 -m grpc_tools.protoc --descriptor_set_in=dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi_config.proto && \
 echo "$CRON_ENTRY" | crontab - && cron -f
 
-# docker run -e INFLUXDB_HOST=192.168.1.34 -e INFLUXDB_PORT=8086 -e INFLUXDB_DB=starlink 
+# docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST=192.168.1.34 -e INFLUXDB_PORT=8086 -e INFLUXDB_DB=starlink 
 # -e "CRON_ENTRY=* * * * * /usr/local/bin/python3 /app/dishStatusInflux_cron.py > /proc/1/fd/1 2>/proc/1/fd/2"
 # --net='br0' --ip='192.168.1.39' neurocis/starlink-grpc-tools
