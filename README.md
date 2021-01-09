@@ -67,3 +67,18 @@ There are `reboot` and `dish_stow` requests in the Device protocol, too, so it s
 The Starlink Android app actually uses port 9201 instead of 9200. Both appear to expose the same gRPC service, but the one on port 9201 uses an HTTP/1.1 wrapper, whereas the one on port 9200 uses HTTP/2.0, which is what most gRPC tools expect.
 
 The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 9001 (HTTP/1.1).
+
+## Docker for InfluxDB ( & MQTT under development )
+
+`dishStatusInflux_cron.py` is a docker-cron friendly script which will post status to an InfluxDB as specified by evironment variables passed to the container. Initialization of the container can be performed with the following command:
+
+```
+docker run -e INFLUXDB_HOST={InfluxDB Hostname} 
+    -e INFLUXDB_PORT={Port, 8086 usually}
+    -e INFLUXDB_USER={Optional, InfluxDB Username}
+    -e INFLUXDB_PWD={Optional, InfluxDB Password}
+    -e INFLUXDB_DB={Pre-created DB name, starlinkstats works well} 
+    -e "CRON_ENTRY=* * * * * /usr/local/bin/python3 /app/dishStatusInflux_cron.py > /proc/1/fd/1 2>/proc/1/fd/2" neurocis/starlink-grpc-tools
+```
+
+Adjust the `CRON_ENTRY` to your desired polling schedule. I (neurocis) will push a Graphana dashboard in the near future, or please create and share your own.
