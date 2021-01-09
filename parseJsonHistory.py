@@ -32,7 +32,6 @@ samples_default = 3600
 samples = samples_default
 print_usage = False
 verbose = False
-parse_all = False
 print_header = False
 run_lengths = False
 
@@ -42,7 +41,7 @@ if not arg_error:
     else:
         for opt, arg in opts:
             if opt == "-a":
-                parse_all = True
+                samples = -1
             elif opt == "-h":
                 print_usage = True
             elif opt == "-r":
@@ -61,7 +60,7 @@ if print_usage or arg_error:
     print("    -a: Parse all valid samples")
     print("    -h: Be helpful")
     print("    -r: Include ping drop run length stats")
-    print("    -s <num>: Parse <num> data samples, default: " + str(samples_default))
+    print("    -s <num>: Number of data samples to parse, default: " + str(samples_default))
     print("    -v: Be verbose")
     print("    -H: print CSV header instead of parsing file")
     sys.exit(1 if arg_error else 0)
@@ -84,8 +83,7 @@ if print_header:
 timestamp = datetime.datetime.utcnow()
 
 g_stats, pd_stats, rl_stats = starlink_json.history_ping_stats(args[0] if args else "-",
-                                                               -1 if parse_all else samples,
-                                                               verbose)
+                                                               samples, verbose)
 
 if g_stats is None:
     # verbose output already happened, so just bail.

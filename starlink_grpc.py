@@ -82,6 +82,30 @@ import grpc
 import spacex.api.device.device_pb2
 import spacex.api.device.device_pb2_grpc
 
+def get_status():
+    """Fetch status data and return it in grpc structure format.
+
+    Raises:
+        grpc.RpcError: Communication or service error.
+    """
+    with grpc.insecure_channel("192.168.100.1:9200") as channel:
+        stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
+    return response.dish_get_status
+
+def get_id():
+    """Return the ID from the dish status information.
+
+    Returns:
+        A string identifying the Starlink user terminal reachable from the
+        local network, or None if no user terminal is currently reachable.
+    """
+    try:
+        status = get_status()
+        return status.device_info.id
+    except grpc.RpcError:
+        return None
+
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
