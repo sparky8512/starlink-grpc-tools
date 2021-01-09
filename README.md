@@ -73,7 +73,7 @@ The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 90
 `dishStatusInflux_cron.py` is a docker-cron friendly script which will post status to an InfluxDB as specified by evironment variables passed to the container. Initialization of the container can be performed with the following command:
 
 ```
-docker run -e INFLUXDB_HOST={InfluxDB Hostname} 
+docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} 
     -e INFLUXDB_PORT={Port, 8086 usually}
     -e INFLUXDB_USER={Optional, InfluxDB Username}
     -e INFLUXDB_PWD={Optional, InfluxDB Password}
