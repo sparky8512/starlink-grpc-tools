@@ -18,11 +18,13 @@ def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
     Returns:
-        A tuple with 2 lists, the first with general stat names and the
-        second with ping drop run length stat names.
+        A tuple with 3 lists, the first with general stat names, the second
+        with ping drop stat names, and the third with ping drop run length
+        stat names.
     """
     return [
-        "samples",
+        "samples"
+    ], [
         "total_ping_drop",
         "count_full_ping_drop",
         "count_obstructed",
@@ -66,18 +68,19 @@ def history_ping_stats(filename, parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 2 dicts, the first mapping general stat names
-        to their values and the second mapping ping drop run length stat names
-        to their values.
+        On success, a tuple with 3 dicts, the first mapping general stat names
+        to their values, the second mapping ping drop stat names to their
+        values and the third mapping ping drop run length stat names to their
+        values.
 
-        On failure, the tuple (None, None).
+        On failure, the tuple (None, None, None).
     """
     try:
         history = get_history(filename)
     except Exception as e:
         if verbose:
             print("Failed getting history: " + str(e))
-        return None, None
+        return None, None, None
 
     # "current" is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.
@@ -161,7 +164,8 @@ def history_ping_stats(filename, parse_samples, verbose=False):
         run_length = 0
 
     return {
-        "samples": parse_samples,
+        "samples": parse_samples
+    }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
         "count_obstructed": count_obstruct,

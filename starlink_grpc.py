@@ -4,13 +4,17 @@ This module may eventually contain more expansive parsing logic, but for now
 it contains functions to parse the history data for some specific packet loss
 statistics.
 
-General ping drop (packet loss) statistics:
-    This group of statistics characterize the packet loss (labeled "ping drop"
-    in the field names of the Starlink gRPC service protocol) in various ways.
+General statistics:
+    This group of statistics contains data relevant to all the other groups.
 
     The sample interval is currently 1 second.
 
         samples: The number of valid samples analyzed.
+
+General ping drop (packet loss) statistics:
+    This group of statistics characterize the packet loss (labeled "ping drop"
+    in the field names of the Starlink gRPC service protocol) in various ways.
+
         total_ping_drop: The total amount of time, in sample intervals, that
             experienced ping drop.
         count_full_ping_drop: The number of samples that experienced 100%
@@ -62,13 +66,13 @@ Ping drop run length statistics:
 
     No sample should be counted in more than one of the run length stats or
     stat elements, so the total of all of them should be equal to
-    count_full_ping_drop from the general stats.
+    count_full_ping_drop from the ping drop stats.
 
     Samples that experience less than 100% ping drop are not counted in this
     group of stats, even if they happen at the beginning or end of a run of
     100% ping drop samples. To compute the amount of time that experienced
     ping loss in less than a single run of 100% ping drop, use
-    (total_ping_drop - count_full_ping_drop) from the general stats.
+    (total_ping_drop - count_full_ping_drop) from the ping drop stats.
 """
 
 from itertools import chain
@@ -82,11 +86,13 @@ def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
     Returns:
-        A tuple with 2 lists, the first with general stat names and the
-        second with ping drop run length stat names.
+        A tuple with 3 lists, the first with general stat names, the second
+        with ping drop stat names, and the third with ping drop run length
+        stat names.
     """
     return [
-        "samples",
+        "samples"
+    ], [
         "total_ping_drop",
         "count_full_ping_drop",
         "count_obstructed",
@@ -122,11 +128,12 @@ def history_ping_stats(parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 2 dicts, the first mapping general stat names
-        to their values and the second mapping ping drop run length stat names
-        to their values.
+        On success, a tuple with 3 dicts, the first mapping general stat names
+        to their values, the second mapping ping drop stat names to their
+        values and the third mapping ping drop run length stat names to their
+        values.
 
-        On failure, the tuple (None, None).
+        On failure, the tuple (None, None, None).
     """
     try:
         history = get_history()
@@ -134,7 +141,7 @@ def history_ping_stats(parse_samples, verbose=False):
         if verbose:
             # RpcError is too verbose to print the details.
             print("Failed getting history")
-        return None, None
+        return None, None, None
 
     # 'current' is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.
@@ -218,7 +225,8 @@ def history_ping_stats(parse_samples, verbose=False):
         run_length = 0
 
     return {
-        "samples": parse_samples,
+        "samples": parse_samples
+    }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
         "count_obstructed": count_obstruct,

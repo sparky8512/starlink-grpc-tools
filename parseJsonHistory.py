@@ -66,11 +66,12 @@ if print_usage or arg_error:
     print("    -H: print CSV header instead of parsing file")
     sys.exit(1 if arg_error else 0)
 
-fields, rl_fields = starlink_json.history_ping_field_names()
+g_fields, pd_fields, rl_fields = starlink_json.history_ping_field_names()
 
 if print_header:
     header = ["datetimestamp_utc"]
-    header.extend(fields)
+    header.extend(g_fields)
+    header.extend(pd_fields)
     if run_lengths:
         for field in rl_fields:
             if field.startswith("run_"):
@@ -82,24 +83,24 @@ if print_header:
 
 timestamp = datetime.datetime.utcnow()
 
-stats, rl_stats = starlink_json.history_ping_stats(args[0] if args else "-",
-                                                   -1 if parse_all else samples,
-                                                   verbose)
+g_stats, pd_stats, rl_stats = starlink_json.history_ping_stats(args[0] if args else "-",
+                                                               -1 if parse_all else samples,
+                                                               verbose)
 
-if stats is None or rl_stats is None:
+if g_stats is None:
     # verbose output already happened, so just bail.
     sys.exit(1)
 
 if verbose:
-    print("Parsed samples:        " + str(stats["samples"]))
-    print("Total ping drop:       " + str(stats["total_ping_drop"]))
-    print("Count of drop == 1:    " + str(stats["count_full_ping_drop"]))
-    print("Obstructed:            " + str(stats["count_obstructed"]))
-    print("Obstructed ping drop:  " + str(stats["total_obstructed_ping_drop"]))
-    print("Obstructed drop == 1:  " + str(stats["count_full_obstructed_ping_drop"]))
-    print("Unscheduled:           " + str(stats["count_unscheduled"]))
-    print("Unscheduled ping drop: " + str(stats["total_unscheduled_ping_drop"]))
-    print("Unscheduled drop == 1: " + str(stats["count_full_unscheduled_ping_drop"]))
+    print("Parsed samples:        " + str(g_stats["samples"]))
+    print("Total ping drop:       " + str(pd_stats["total_ping_drop"]))
+    print("Count of drop == 1:    " + str(pd_stats["count_full_ping_drop"]))
+    print("Obstructed:            " + str(pd_stats["count_obstructed"]))
+    print("Obstructed ping drop:  " + str(pd_stats["total_obstructed_ping_drop"]))
+    print("Obstructed drop == 1:  " + str(pd_stats["count_full_obstructed_ping_drop"]))
+    print("Unscheduled:           " + str(pd_stats["count_unscheduled"]))
+    print("Unscheduled ping drop: " + str(pd_stats["total_unscheduled_ping_drop"]))
+    print("Unscheduled drop == 1: " + str(pd_stats["count_full_unscheduled_ping_drop"]))
     if run_lengths:
         print("Initial drop run fragment: " + str(rl_stats["init_run_fragment"]))
         print("Final drop run fragment: " + str(rl_stats["final_run_fragment"]))
@@ -107,7 +108,8 @@ if verbose:
         print("Per-minute drop runs:  " + ", ".join(str(x) for x in rl_stats["run_minutes"]))
 else:
     csv_data = [timestamp.replace(microsecond=0).isoformat()]
-    csv_data.extend(str(stats[field]) for field in fields)
+    csv_data.extend(str(g_stats[field]) for field in g_fields)
+    csv_data.extend(str(pd_stats[field]) for field in pd_fields)
     if run_lengths:
         for field in rl_fields:
             if field.startswith("run_"):
