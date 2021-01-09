@@ -81,4 +81,4 @@ docker run -e INFLUXDB_HOST={InfluxDB Hostname}
     -e "CRON_ENTRY=* * * * * /usr/local/bin/python3 /app/dishStatusInflux_cron.py > /proc/1/fd/1 2>/proc/1/fd/2" neurocis/starlink-grpc-tools
 ```
 
-Adjust the `CRON_ENTRY` to your desired polling schedule. I (neurocis) will push a Graphana dashboard in the near future, or please create and share your own.
+Adjust the `CRON_ENTRY` to your desired polling schedule. I (neurocis) will push a Grafana dashboard in the near future, or please create and share your own.
