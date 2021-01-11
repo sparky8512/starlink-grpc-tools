@@ -72,15 +72,15 @@ The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 90
 
 ## Docker for InfluxDB ( & MQTT under development )
 
-`dishStatusInflux_cron.py` is a docker-cron friendly script which will post status to an InfluxDB as specified by evironment variables passed to the container. Initialization of the container can be performed with the following command:
+Initialization of the container can be performed with the following command:
 
 ```
-docker run -e INFLUXDB_HOST={InfluxDB Hostname} 
-    -e INFLUXDB_PORT={Port, 8086 usually}
-    -e INFLUXDB_USER={Optional, InfluxDB Username}
-    -e INFLUXDB_PWD={Optional, InfluxDB Password}
-    -e INFLUXDB_DB={Pre-created DB name, starlinkstats works well} 
-    -e "CRON_ENTRY=* * * * * /usr/local/bin/python3 /app/dishStatusInflux_cron.py > /proc/1/fd/1 2>/proc/1/fd/2" neurocis/starlink-grpc-tools
+docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
+    -e INFLUXDB_PORT={Port, 8086 usually} \
+    -e INFLUXDB_USER={Optional, InfluxDB Username} \
+    -e INFLUXDB_PWD={Optional, InfluxDB Password} \
+    -e INFLUXDB_DB={Pre-created DB name, starlinkstats works well} \
+    neurocis/starlink-grpc-tools dishStatusInflux.py -v
 ```
 
-Adjust the `CRON_ENTRY` to your desired polling schedule. I (neurocis) will push a Grafana dashboard in the near future, or please create and share your own.
+`dishStatusInflux.py -v` is optional and will run same but not -verbose, or you can replace it with one of the other scripts if you wish to run that instead. I (neurocis) will push a Grafana dashboard in the near future, or please create and share your own.
