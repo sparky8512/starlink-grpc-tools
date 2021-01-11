@@ -11,9 +11,11 @@
 ######################################################################
 
 import datetime
+import os
 import sys
 import getopt
 
+import warnings
 from influxdb import InfluxDBClient
 
 import starlink_grpc
@@ -21,7 +23,7 @@ import starlink_grpc
 arg_error = False
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:vD:P:R:U:")
+    opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:vC:D:IP:R:SU:")
 except getopt.GetoptError as err:
     print(str(err))
     arg_error = True
@@ -36,6 +38,35 @@ host_default = "localhost"
 database_default = "dishstats"
 icargs = {"host": host_default, "timeout": 5, "database": database_default}
 rp = None
+
+# For each of these check they are both set and not empty string
+influxdb_host = os.environ.get("INFLUXDB_HOST")
+if influxdb_host:
+    icargs["host"] = influxdb_host
+influxdb_port = os.environ.get("INFLUXDB_PORT")
+if influxdb_port:
+    icargs["port"] = int(influxdb_port)
+influxdb_user = os.environ.get("INFLUXDB_USER")
+if influxdb_user:
+    icargs["username"] = influxdb_user
+influxdb_pwd = os.environ.get("INFLUXDB_PWD")
+if influxdb_pwd:
+    icargs["password"] = influxdb_pwd
+influxdb_db = os.environ.get("INFLUXDB_DB")
+if influxdb_db:
+    icargs["database"] = influxdb_db
+influxdb_rp = os.environ.get("INFLUXDB_RP")
+if influxdb_rp:
+    rp = influxdb_rp
+influxdb_ssl = os.environ.get("INFLUXDB_SSL")
+if influxdb_ssl:
+    icargs["ssl"] = True
+    if influxdb_ssl.lower() == "secure":
+        icargs["verify_ssl"] = True
+    elif influxdb_ssl.lower() == "insecure":
+        icargs["verify_ssl"] = False
+    else:
+        icargs["verify_ssl"] = influxdb_ssl
 
 if not arg_error:
     if len(args) > 0:
@@ -56,12 +87,21 @@ if not arg_error:
                 samples = int(arg)
             elif opt == "-v":
                 verbose = True
+            elif opt == "-C":
+                icargs["ssl"] = True
+                icargs["verify_ssl"] = arg
             elif opt == "-D":
                 icargs["database"] = arg
+            elif opt == "-I":
+                icargs["ssl"] = True
+                icargs["verify_ssl"] = False
             elif opt == "-P":
                 icargs["password"] = arg
             elif opt == "-R":
                 rp = arg
+            elif opt == "-S":
+                icargs["ssl"] = True
+                icargs["verify_ssl"] = True
             elif opt == "-U":
                 icargs["username"] = arg
 
@@ -79,9 +119,12 @@ if print_usage or arg_error:
     print("    -r: Include ping drop run length stats")
     print("    -s <num>: Number of data samples to parse, default: " + str(samples_default))
     print("    -v: Be verbose")
+    print("    -C <filename>: Enable SSL/TLS using specified CA cert to verify server")
     print("    -D <name>: Database name to use, default: " + database_default)
+    print("    -I: Enable SSL/TLS but disable certificate verification (INSECURE!)")
     print("    -P <word>: Set password for authentication")
     print("    -R <name>: Retention policy name to use")
+    print("    -S: Enable SSL/TLS using default CA cert")
     print("    -U <name>: Set username for authentication")
     sys.exit(1 if arg_error else 0)
 
@@ -117,8 +160,17 @@ points = [{
     "fields": all_stats,
 }]
 
+if "verify_ssl" in icargs and not icargs["verify_ssl"]:
+    # user has explicitly said be insecure, so don't warn about it
+    warnings.filterwarnings("ignore", message="Unverified HTTPS request")
+
 influx_client = InfluxDBClient(**icargs)
 try:
     influx_client.write_points(points, retention_policy=rp)
+    rc = 0
+except Exception as e:
+    print("Failed writing to InfluxDB database: " + str(e))
+    rc = 1
 finally:
     influx_client.close()
+sys.exit(rc)

@@ -17,7 +17,7 @@ The scripts that use [InfluxDB](https://www.influxdata.com/products/influxdb/) f
 
 ## Usage
 
-For `parseJsonHistory.py`, the easiest way to use it is to pipe the `grpcurl` command directly into it. For example:
+`parseJsonHistory.py` takes input from a file and writes its output to standard output. The easiest way to use it is to pipe the `grpcurl` command directly into it. For example:
 ```
 grpcurl -plaintext -d {\"get_history\":{}} 192.168.100.1:9200 SpaceX.API.Device.Device/Handle | python parseJsonHistory.py
 ```
@@ -41,7 +41,7 @@ python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=.
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi.proto
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi_config.proto
 ```
-Then move the resulting files to where the Python scripts can find them, such as in the same directory as the scripts themselves.
+Then move the resulting files to where the Python scripts can find them.
 
 Once those are available, the `dishHistoryStats.py` script can be used in place of the `grpcurl | parseJsonHistory.py` pipeline, with most of the same command line options.
 
@@ -50,13 +50,15 @@ To collect and record summary stats every hour, you can put something like the f
 00 * * * * [ -e ~/dishStats.csv ] || ~/bin/dishHistoryStats.py -H >~/dishStats.csv; ~/bin/dishHistoryStats.py >>~/dishStats.csv
 ```
 
+`dishHistoryInflux.py` and `dishHistoryMqtt.py` are similar, but they send their output to an InfluxDB server and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
+
 `dishDumpStatus.py` is even simpler. Just run it as:
 ```
 python3 dishDumpStatus.py
 ```
 and revel in copious amounts of dish status information. OK, maybe it's not as impressive as all that. This one is really just meant to be a starting point for real functionality to be added to it. The information this script pulls is mostly what appears related to the dish in the Debug Data section of the Starlink app.
 
-`dishStatusCsv.py`, `dishStatusInflux.py`, and `dishStatusMqtt.py` output the same status data, but to various data backends. These scripts currently lack any way to configure them, such as setting server host or authentication credentials, other than by changing the hard-coded values in the scripts.
+`dishStatusCsv.py`, `dishStatusInflux.py`, and `dishStatusMqtt.py` output the same status data, but to various data backends. As with the corresponding history scripts, run them with `-h` command line option for usage details.
 
 ## To Be Done (Maybe)
 
