@@ -13,6 +13,12 @@
 import sys
 import getopt
 
+try:
+    import ssl
+    ssl_ok = True
+except ImportError:
+    ssl_ok = False
+
 import paho.mqtt.publish
 
 import starlink_grpc
@@ -20,7 +26,7 @@ import starlink_grpc
 arg_error = False
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:vU:P:")
+    opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:vC:ISP:U:")
 except getopt.GetoptError as err:
     print(str(err))
     arg_error = True
@@ -32,8 +38,7 @@ print_usage = False
 verbose = False
 run_lengths = False
 host_default = "localhost"
-host = host_default
-port = None
+mqargs = {"hostname": host_default}
 username = None
 password = None
 
@@ -47,17 +52,27 @@ if not arg_error:
             elif opt == "-h":
                 print_usage = True
             elif opt == "-n":
-                host = arg
+                mqargs["hostname"] = arg
             elif opt == "-p":
-                port = int(arg)
+                mqargs["port"] = int(arg)
             elif opt == "-r":
                 run_lengths = True
             elif opt == "-s":
                 samples = int(arg)
             elif opt == "-v":
                 verbose = True
+            elif opt == "-C":
+                mqargs["tls"] = {"ca_certs": arg}
+            elif opt == "-I":
+                if ssl_ok:
+                    mqargs["tls"] = {"cert_reqs": ssl.CERT_NONE}
+                else:
+                    print("No SSL support found")
+                    sys.exit(1)
             elif opt == "-P":
                 password = arg
+            elif opt == "-S":
+                mqargs["tls"] = {}
             elif opt == "-U":
                 username = arg
 
@@ -75,7 +90,10 @@ if print_usage or arg_error:
     print("    -r: Include ping drop run length stats")
     print("    -s <num>: Number of data samples to parse, default: " + str(samples_default))
     print("    -v: Be verbose")
+    print("    -C <filename>: Enable SSL/TLS using specified CA cert to verify broker")
+    print("    -I: Enable SSL/TLS but disable certificate verification (INSECURE!)")
     print("    -P: Set password for username/password authentication")
+    print("    -S: Enable SSL/TLS using default CA cert")
     print("    -U: Set username for authentication")
     sys.exit(1 if arg_error else 0)
 
@@ -102,12 +120,13 @@ if run_lengths:
         else:
             msgs.append((topic_prefix + k, v, 0, False))
 
-optargs = {}
 if username is not None:
-    auth = {"username": username}
+    mqargs["auth"] = {"username": username}
     if password is not None:
-        auth["password"] = password
-    optargs["auth"] = auth
-if port is not None:
-    optargs["port"] = port
-paho.mqtt.publish.multiple(msgs, hostname=host, client_id=dish_id, **optargs)
+        mqargs["auth"]["password"] = password
+
+try:
+    paho.mqtt.publish.multiple(msgs, client_id=dish_id, **mqargs)
+except Exception as e:
+    print("Failed publishing to MQTT broker: " + str(e))
+    sys.exit(1)
