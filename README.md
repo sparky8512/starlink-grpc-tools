@@ -83,4 +83,4 @@ docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} 
     neurocis/starlink-grpc-tools dishStatusInflux.py -v
 ```
 
-`dishStatusInflux.py -v` is optional and will run same but not -verbose, or you can replace it with one the other scripts if you wish to run that instead. I (neurocis) will push a Grafana dashboard in the near future, or please create and share your own.
+`dishStatusInflux.py -v` is optional and will run same but not -verbose, or you can replace it with one of the other scripts if you wish to run that instead. I (neurocis) will push a Grafana dashboard in the near future, or please create and share your own.
