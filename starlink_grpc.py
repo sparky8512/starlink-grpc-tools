@@ -231,7 +231,7 @@ def history_ping_stats(parse_samples, verbose=False):
             count_unsched += 1
             total_unsched_drop += d
             if d >= 1:
-                count_full_unsched += d
+                count_full_unsched += 1
         # scheduled=false and obstructed=true do not ever appear to overlap,
         # but in case they do in the future, treat that as just unscheduled
         # in order to avoid double-counting it.

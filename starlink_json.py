@@ -100,13 +100,13 @@ def history_ping_stats(filename, parse_samples, verbose=False):
     # index to next data sample after the newest one.
     offset = current % samples
 
-    tot = 0
+    tot = 0.0
     count_full_drop = 0
     count_unsched = 0
-    total_unsched_drop = 0
+    total_unsched_drop = 0.0
     count_full_unsched = 0
     count_obstruct = 0
-    total_obstruct_drop = 0
+    total_obstruct_drop = 0.0
     count_full_obstruct = 0
 
     second_runs = [0] * 60
@@ -126,9 +126,10 @@ def history_ping_stats(filename, parse_samples, verbose=False):
 
     for i in sample_range:
         d = history["popPingDropRate"][i]
-        tot += d
         if d >= 1:
-            count_full_drop += d
+            # just in case...
+            d = 1
+            count_full_drop += 1
             run_length += 1
         elif run_length > 0:
             if init_run_length is None:
@@ -145,7 +146,7 @@ def history_ping_stats(filename, parse_samples, verbose=False):
             count_unsched += 1
             total_unsched_drop += d
             if d >= 1:
-                count_full_unsched += d
+                count_full_unsched += 1
         # scheduled=false and obstructed=true do not ever appear to overlap,
         # but in case they do in the future, treat that as just unscheduled
         # in order to avoid double-counting it.
@@ -153,7 +154,8 @@ def history_ping_stats(filename, parse_samples, verbose=False):
             count_obstruct += 1
             total_obstruct_drop += d
             if d >= 1:
-                count_full_obstruct += d
+                count_full_obstruct += 1
+        tot += d
 
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
