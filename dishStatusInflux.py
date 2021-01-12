@@ -33,7 +33,7 @@ except getopt.GetoptError as err:
 print_usage = False
 verbose = False
 host_default = "localhost"
-database_default = "dishstats"
+database_default = "starlinkstats"
 icargs = {"host": host_default, "timeout": 5, "database": database_default}
 rp = None
 default_sleep_time = 30

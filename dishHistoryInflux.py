@@ -35,7 +35,7 @@ print_usage = False
 verbose = False
 run_lengths = False
 host_default = "localhost"
-database_default = "dishstats"
+database_default = "starlinkstats"
 icargs = {"host": host_default, "timeout": 5, "database": database_default}
 rp = None
 
