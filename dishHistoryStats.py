@@ -13,6 +13,7 @@
 import datetime
 import sys
 import getopt
+import logging
 
 import starlink_grpc
 
@@ -61,6 +62,8 @@ if print_usage or arg_error:
     print("    -H: print CSV header instead of parsing file")
     sys.exit(1 if arg_error else 0)
 
+logging.basicConfig(format="%(levelname)s: %(message)s")
+
 g_fields, pd_fields, rl_fields = starlink_grpc.history_ping_field_names()
 
 if print_header:
@@ -78,10 +81,10 @@ if print_header:
 
 timestamp = datetime.datetime.utcnow()
 
-g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
-
-if g_stats is None:
-    # verbose output already happened, so just bail.
+try:
+    g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
+except starlink_grpc.GrpcError as e:
+    logging.error("Failure getting ping stats: " + str(e))
     sys.exit(1)
 
 if verbose:

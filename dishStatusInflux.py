@@ -12,8 +12,9 @@ import time
 import os
 import sys
 import getopt
-
+import logging
 import warnings
+
 from influxdb import InfluxDBClient
 from influxdb import SeriesHelper
 
@@ -123,6 +124,18 @@ if print_usage or arg_error:
     print("    -U <name>: Set username for authentication")
     sys.exit(1 if arg_error else 0)
 
+logging.basicConfig(format="%(levelname)s: %(message)s")
+
+def conn_error(msg):
+    # Connection errors that happen while running in an interval loop are
+    # not critical failures, because they can (usually) be retried, or
+    # because they will be recorded as dish state unavailable. They're still
+    # interesting, though, so print them even in non-verbose mode.
+    if sleep_time > 0:
+        print(msg)
+    else:
+        logging.error(msg)
+
 class DeviceStatusSeries(SeriesHelper):
     class Meta:
         series_name = "spacex.starlink.user_terminal.status"
@@ -151,6 +164,7 @@ if "verify_ssl" in icargs and not icargs["verify_ssl"]:
 
 influx_client = InfluxDBClient(**icargs)
 
+rc = 0
 try:
     dish_channel = None
     last_id = None
@@ -182,6 +196,7 @@ try:
                 pop_ping_latency_ms=status.pop_ping_latency_ms,
                 currently_obstructed=status.obstruction_stats.currently_obstructed,
                 fraction_obstructed=status.obstruction_stats.fraction_obstructed)
+            pending += 1
             last_id = status.device_info.id
             last_failed = False
         except grpc.RpcError:
@@ -189,25 +204,36 @@ try:
                 dish_channel.close()
                 dish_channel = None
             if last_failed:
-                if last_id is not None:
+                if last_id is None:
+                    conn_error("Dish unreachable and ID unknown, so not recording state")
+                    # When not looping, report this as failure exit status
+                    rc = 1
+                else:
+                    if verbose:
+                        print("Dish unreachable")
                     DeviceStatusSeries(id=last_id, state="DISH_UNREACHABLE")
+                    pending += 1
             else:
+                if verbose:
+                    print("Dish RPC channel error")
                 # Retry once, because the connection may have been lost while
                 # we were sleeping
                 last_failed = True
                 continue
-        pending = pending + 1
         if verbose:
-            print("Samples: " + str(pending))
-        count = count + 1
+            print("Samples queued: " + str(pending))
+        count += 1
         if count > 5:
             try:
-                DeviceStatusSeries.commit(influx_client)
+                if pending:
+                    DeviceStatusSeries.commit(influx_client)
+                    rc = 0
                 if verbose:
-                    print("Wrote " + str(pending))
+                    print("Samples written: " + str(pending))
                 pending = 0
             except Exception as e:
-                print("Failed to write: " + str(e))
+                conn_error("Failed to write: " + str(e))
+                rc = 1
             count = 0
         if sleep_time > 0:
             time.sleep(sleep_time)
@@ -216,12 +242,13 @@ try:
 finally:
     # Flush on error/exit
     try:
-        DeviceStatusSeries.commit(influx_client)
+        if pending:
+            DeviceStatusSeries.commit(influx_client)
+            rc = 0
         if verbose:
-            print("Wrote " + str(pending))
-        rc = 0
+            print("Samples written: " + str(pending))
     except Exception as e:
-        print("Failed to write: " + str(e))
+        conn_error("Failed to write: " + str(e))
         rc = 1
     influx_client.close()
     if dish_channel is not None:

@@ -14,6 +14,7 @@ import datetime
 import os
 import sys
 import getopt
+import logging
 
 import warnings
 from influxdb import InfluxDBClient
@@ -128,19 +129,20 @@ if print_usage or arg_error:
     print("    -U <name>: Set username for authentication")
     sys.exit(1 if arg_error else 0)
 
-dish_id = starlink_grpc.get_id()
+logging.basicConfig(format="%(levelname)s: %(message)s")
 
-if dish_id is None:
-    if verbose:
-        print("Unable to connect to Starlink user terminal")
+try:
+    dish_id = starlink_grpc.get_id()
+except starlink_grpc.GrpcError as e:
+    logging.error("Failure getting dish ID: " + str(e))
     sys.exit(1)
 
 timestamp = datetime.datetime.utcnow()
 
-g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
-
-if g_stats is None:
-    # verbose output already happened, so just bail.
+try:
+    g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
+except starlink_grpc.GrpcError as e:
+    logging.error("Failure getting ping stats: " + str(e))
     sys.exit(1)
 
 all_stats = g_stats.copy()
@@ -169,7 +171,7 @@ try:
     influx_client.write_points(points, retention_policy=rp)
     rc = 0
 except Exception as e:
-    print("Failed writing to InfluxDB database: " + str(e))
+    logging.error("Failed writing to InfluxDB database: " + str(e))
     rc = 1
 finally:
     influx_client.close()
