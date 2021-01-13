@@ -14,6 +14,11 @@ import sys
 
 from itertools import chain
 
+
+class JsonError(Exception):
+    """Provides error info when something went wrong with JSON parsing."""
+
+
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
@@ -46,15 +51,16 @@ def get_history(filename):
     Args:
         filename (str): Filename from which to read JSON data, or "-" to read
             from standard input.
+
+    Raises:
+        Various exceptions depending on Python version: Failure to open or
+        read input or invalid JSON read on input.
     """
     if filename == "-":
         json_data = json.load(sys.stdin)
     else:
-        json_file = open(filename)
-        try:
+        with open(filename) as json_file:
             json_data = json.load(json_file)
-        finally:
-            json_file.close()
     return json_data["dishGetHistory"]
 
 def history_ping_stats(filename, parse_samples, verbose=False):
@@ -68,19 +74,19 @@ def history_ping_stats(filename, parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 3 dicts, the first mapping general stat names
-        to their values, the second mapping ping drop stat names to their
-        values and the third mapping ping drop run length stat names to their
-        values.
+        A tuple with 3 dicts, the first mapping general stat names to their
+        values, the second mapping ping drop stat names to their values and
+        the third mapping ping drop run length stat names to their values.
 
-        On failure, the tuple (None, None, None).
+    Raises:
+        JsonError: Failure to open, read, or parse JSON on input.
     """
     try:
         history = get_history(filename)
+    except ValueError as e:
+        raise JsonError("Failed to parse JSON: " + str(e))
     except Exception as e:
-        if verbose:
-            print("Failed getting history: " + str(e))
-        return None, None, None
+        raise JsonError(e)
 
     # "current" is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.

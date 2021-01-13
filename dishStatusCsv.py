@@ -10,6 +10,7 @@
 import datetime
 import sys
 import getopt
+import logging
 
 import grpc
 
@@ -44,6 +45,8 @@ if print_usage or arg_error:
     print("    -H: print CSV header instead of parsing file")
     sys.exit(1 if arg_error else 0)
 
+logging.basicConfig(format="%(levelname)s: %(message)s")
+
 if print_header:
     header = [
         "datetimestamp_utc",
@@ -71,7 +74,7 @@ try:
         stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
         response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
 except grpc.RpcError:
-    print("Failed getting status info")
+    logging.error("Failed getting status info")
     sys.exit(1)
 
 timestamp = datetime.datetime.utcnow()

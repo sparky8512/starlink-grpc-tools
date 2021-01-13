@@ -12,6 +12,7 @@
 
 import sys
 import getopt
+import logging
 
 try:
     import ssl
@@ -97,17 +98,18 @@ if print_usage or arg_error:
     print("    -U: Set username for authentication")
     sys.exit(1 if arg_error else 0)
 
-dish_id = starlink_grpc.get_id()
+logging.basicConfig(format="%(levelname)s: %(message)s")
 
-if dish_id is None:
-    if verbose:
-        print("Unable to connect to Starlink user terminal")
+try:
+    dish_id = starlink_grpc.get_id()
+except starlink_grpc.GrpcError as e:
+    logging.error("Failure getting dish ID: " + str(e))
     sys.exit(1)
 
-g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
-
-if g_stats is None:
-    # verbose output already happened, so just bail.
+try:
+    g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
+except starlink_grpc.GrpcError as e:
+    logging.error("Failure getting ping stats: " + str(e))
     sys.exit(1)
 
 topic_prefix = "starlink/dish_ping_stats/" + dish_id + "/"
@@ -128,5 +130,5 @@ if username is not None:
 try:
     paho.mqtt.publish.multiple(msgs, client_id=dish_id, **mqargs)
 except Exception as e:
-    print("Failed publishing to MQTT broker: " + str(e))
+    logging.error("Failed publishing to MQTT broker: " + str(e))
     sys.exit(1)

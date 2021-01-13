@@ -82,6 +82,21 @@ import grpc
 import spacex.api.device.device_pb2
 import spacex.api.device.device_pb2_grpc
 
+
+class GrpcError(Exception):
+    """Provides error info when something went wrong with a gRPC call."""
+    def __init__(self, e, *args, **kwargs):
+        # grpc.RpcError is too verbose to print in whole, but it may also be
+        # a Call object, and that class has some minimally useful info.
+        if isinstance(e, grpc.Call):
+            msg = e.details()
+        elif isinstance(e, grpc.RpcError):
+            msg = "Unknown communication or service error"
+        else:
+            msg = str(e)
+        super().__init__(msg, *args, **kwargs)
+
+
 def get_status():
     """Fetch status data and return it in grpc structure format.
 
@@ -98,13 +113,16 @@ def get_id():
 
     Returns:
         A string identifying the Starlink user terminal reachable from the
-        local network, or None if no user terminal is currently reachable.
+        local network.
+
+    Raises:
+        GrpcError: No user terminal is currently reachable.
     """
     try:
         status = get_status()
         return status.device_info.id
-    except grpc.RpcError:
-        return None
+    except grpc.RpcError as e:
+        raise GrpcError(e)
 
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
@@ -152,20 +170,18 @@ def history_ping_stats(parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 3 dicts, the first mapping general stat names
-        to their values, the second mapping ping drop stat names to their
-        values and the third mapping ping drop run length stat names to their
-        values.
+        A tuple with 3 dicts, the first mapping general stat names to their
+        values, the second mapping ping drop stat names to their values and
+        the third mapping ping drop run length stat names to their values.
 
-        On failure, the tuple (None, None, None).
+    Raises:
+        GrpcError: Failed getting history info from the Starlink user
+            terminal.
     """
     try:
         history = get_history()
-    except grpc.RpcError:
-        if verbose:
-            # RpcError is too verbose to print the details.
-            print("Failed getting history")
-        return None, None, None
+    except grpc.RpcError as e:
+        raise GrpcError(e)
 
     # 'current' is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.
