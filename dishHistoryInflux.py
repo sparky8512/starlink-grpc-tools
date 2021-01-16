@@ -1,41 +1,45 @@
 #!/usr/bin/python3
 ######################################################################
 #
-# Write Starlink user terminal status info to an InfluxDB database.
+# Write Starlink user terminal packet loss statistics to an InfluxDB
+# database.
 #
-# This script will poll current status and write it to the specified
-# InfluxDB database either once or in a periodic loop.
+# This script examines the most recent samples from the history data,
+# computes several different metrics related to packet loss, and
+# writes those to the specified InfluxDB database.
 #
 ######################################################################
 
 import getopt
+import datetime
 import logging
 import os
 import sys
 import time
 import warnings
 
-import grpc
 from influxdb import InfluxDBClient
-from influxdb import SeriesHelper
 
-import spacex.api.device.device_pb2
-import spacex.api.device.device_pb2_grpc
+import starlink_grpc
 
 
 def main():
     arg_error = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hn:p:t:vC:D:IP:R:SU:")
+        opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:t:vC:D:IP:R:SU:")
     except getopt.GetoptError as err:
         print(str(err))
         arg_error = True
 
+    # Default to 1 hour worth of data samples.
+    samples_default = 3600
+    samples = None
     print_usage = False
     verbose = False
     default_loop_time = 0
     loop_time = default_loop_time
+    run_lengths = False
     host_default = "localhost"
     database_default = "starlinkstats"
     icargs = {"host": host_default, "timeout": 5, "database": database_default}
@@ -76,14 +80,20 @@ def main():
             arg_error = True
         else:
             for opt, arg in opts:
-                if opt == "-h":
+                if opt == "-a":
+                    samples = -1
+                elif opt == "-h":
                     print_usage = True
                 elif opt == "-n":
                     icargs["host"] = arg
                 elif opt == "-p":
                     icargs["port"] = int(arg)
+                elif opt == "-r":
+                    run_lengths = True
+                elif opt == "-s":
+                    samples = int(arg)
                 elif opt == "-t":
-                    loop_time = int(arg)
+                    loop_time = float(arg)
                 elif opt == "-v":
                     verbose = True
                 elif opt == "-C":
@@ -111,9 +121,13 @@ def main():
     if print_usage or arg_error:
         print("Usage: " + sys.argv[0] + " [options...]")
         print("Options:")
+        print("    -a: Parse all valid samples")
         print("    -h: Be helpful")
         print("    -n <name>: Hostname of InfluxDB server, default: " + host_default)
         print("    -p <num>: Port number to use on InfluxDB server")
+        print("    -r: Include ping drop run length stats")
+        print("    -s <num>: Number of data samples to parse, default: loop interval,")
+        print("              if set, else " + str(samples_default))
         print("    -t <num>: Loop interval in seconds or 0 for no loop, default: " +
               str(default_loop_time))
         print("    -v: Be verbose")
@@ -126,38 +140,17 @@ def main():
         print("    -U <name>: Set username for authentication")
         sys.exit(1 if arg_error else 0)
 
+    if samples is None:
+        samples = int(loop_time) if loop_time > 0 else samples_default
+
     logging.basicConfig(format="%(levelname)s: %(message)s")
 
     class GlobalState:
         pass
 
     gstate = GlobalState()
-    gstate.dish_channel = None
     gstate.dish_id = None
-    gstate.pending = 0
-
-    class DeviceStatusSeries(SeriesHelper):
-        class Meta:
-            series_name = "spacex.starlink.user_terminal.status"
-            fields = [
-                "hardware_version",
-                "software_version",
-                "state",
-                "alert_motors_stuck",
-                "alert_thermal_throttle",
-                "alert_thermal_shutdown",
-                "alert_unexpected_location",
-                "snr",
-                "seconds_to_first_nonempty_slot",
-                "pop_ping_drop_rate",
-                "downlink_throughput_bps",
-                "uplink_throughput_bps",
-                "pop_ping_latency_ms",
-                "currently_obstructed",
-                "fraction_obstructed",
-            ]
-            tags = ["id"]
-            retention_policy = rp
+    gstate.points = []
 
     def conn_error(msg, *args):
         # Connection errors that happen in an interval loop are not critical
@@ -167,76 +160,59 @@ def main():
         else:
             logging.error(msg, *args)
 
-    def flush_pending(client):
+    def flush_points(client):
         try:
-            DeviceStatusSeries.commit(client)
+            client.write_points(gstate.points, retention_policy=rp)
             if verbose:
-                print("Data points written: " + str(gstate.pending))
-            gstate.pending = 0
+                print("Data points written: " + str(len(gstate.points)))
+                gstate.points.clear()
         except Exception as e:
             conn_error("Failed writing to InfluxDB database: %s", str(e))
             return 1
 
         return 0
 
-    def get_status_retry():
-        """Try getting the status at most twice"""
-
-        channel_reused = True
-        while True:
-            try:
-                if gstate.dish_channel is None:
-                    gstate.dish_channel = grpc.insecure_channel("192.168.100.1:9200")
-                    channel_reused = False
-                stub = spacex.api.device.device_pb2_grpc.DeviceStub(gstate.dish_channel)
-                response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
-                return response.dish_get_status
-            except grpc.RpcError:
-                gstate.dish_channel.close()
-                gstate.dish_channel = None
-                if channel_reused:
-                    # If the channel was open already, the connection may have
-                    # been lost in the time since prior loop iteration, so after
-                    # closing it, retry once, in case the dish is now reachable.
-                    if verbose:
-                        print("Dish RPC channel error")
-                else:
-                    raise
-
     def loop_body(client):
-        try:
-            status = get_status_retry()
-            DeviceStatusSeries(id=status.device_info.id,
-                               hardware_version=status.device_info.hardware_version,
-                               software_version=status.device_info.software_version,
-                               state=spacex.api.device.dish_pb2.DishState.Name(status.state),
-                               alert_motors_stuck=status.alerts.motors_stuck,
-                               alert_thermal_throttle=status.alerts.thermal_throttle,
-                               alert_thermal_shutdown=status.alerts.thermal_shutdown,
-                               alert_unexpected_location=status.alerts.unexpected_location,
-                               snr=status.snr,
-                               seconds_to_first_nonempty_slot=status.seconds_to_first_nonempty_slot,
-                               pop_ping_drop_rate=status.pop_ping_drop_rate,
-                               downlink_throughput_bps=status.downlink_throughput_bps,
-                               uplink_throughput_bps=status.uplink_throughput_bps,
-                               pop_ping_latency_ms=status.pop_ping_latency_ms,
-                               currently_obstructed=status.obstruction_stats.currently_obstructed,
-                               fraction_obstructed=status.obstruction_stats.fraction_obstructed)
-            gstate.dish_id = status.device_info.id
-        except grpc.RpcError:
-            if gstate.dish_id is None:
-                conn_error("Dish unreachable and ID unknown, so not recording state")
-                return 1
-            else:
+        if gstate.dish_id is None:
+            try:
+                gstate.dish_id = starlink_grpc.get_id()
                 if verbose:
-                    print("Dish unreachable")
-                DeviceStatusSeries(id=gstate.dish_id, state="DISH_UNREACHABLE")
+                    print("Using dish ID: " + gstate.dish_id)
+            except starlink_grpc.GrpcError as e:
+                conn_error("Failure getting dish ID: %s", str(e))
+                return 1
 
-        gstate.pending += 1
+        timestamp = datetime.datetime.utcnow()
+
+        try:
+            g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
+        except starlink_grpc.GrpcError as e:
+            conn_error("Failure getting ping stats: %s", str(e))
+            return 1
+
+        all_stats = g_stats.copy()
+        all_stats.update(pd_stats)
+        if run_lengths:
+            for k, v in rl_stats.items():
+                if k.startswith("run_"):
+                    for i, subv in enumerate(v, start=1):
+                        all_stats[k + "_" + str(i)] = subv
+                else:
+                    all_stats[k] = v
+
+        gstate.points.append({
+            "measurement": "spacex.starlink.user_terminal.ping_stats",
+            "tags": {
+                "id": gstate.dish_id
+            },
+            "time": timestamp,
+            "fields": all_stats,
+        })
         if verbose:
-            print("Data points queued: " + str(gstate.pending))
-        if gstate.pending >= flush_limit:
-            return flush_pending(client)
+            print("Data points queued: " + str(len(gstate.points)))
+
+        if len(gstate.points) >= flush_limit:
+            return flush_points(client)
 
         return 0
 
@@ -256,12 +232,9 @@ def main():
             else:
                 break
     finally:
-        # Flush on error/exit
-        if gstate.pending:
-            rc = flush_pending(influx_client)
+        if gstate.points:
+            rc = flush_points(influx_client)
         influx_client.close()
-        if gstate.dish_channel is not None:
-            gstate.dish_channel.close()
 
     sys.exit(rc)
 

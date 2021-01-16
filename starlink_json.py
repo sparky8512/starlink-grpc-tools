@@ -14,15 +14,22 @@ import sys
 
 from itertools import chain
 
+
+class JsonError(Exception):
+    """Provides error info when something went wrong with JSON parsing."""
+
+
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
     Returns:
-        A tuple with 2 lists, the first with general stat names and the
-        second with ping drop run length stat names.
+        A tuple with 3 lists, the first with general stat names, the second
+        with ping drop stat names, and the third with ping drop run length
+        stat names.
     """
     return [
         "samples",
+    ], [
         "total_ping_drop",
         "count_full_ping_drop",
         "count_obstructed",
@@ -30,13 +37,14 @@ def history_ping_field_names():
         "count_full_obstructed_ping_drop",
         "count_unscheduled",
         "total_unscheduled_ping_drop",
-        "count_full_unscheduled_ping_drop"
+        "count_full_unscheduled_ping_drop",
     ], [
         "init_run_fragment",
         "final_run_fragment",
         "run_seconds",
-        "run_minutes"
+        "run_minutes",
     ]
+
 
 def get_history(filename):
     """Read JSON data and return the raw history in dict format.
@@ -44,16 +52,18 @@ def get_history(filename):
     Args:
         filename (str): Filename from which to read JSON data, or "-" to read
             from standard input.
+
+    Raises:
+        Various exceptions depending on Python version: Failure to open or
+        read input or invalid JSON read on input.
     """
     if filename == "-":
         json_data = json.load(sys.stdin)
     else:
-        json_file = open(filename)
-        try:
+        with open(filename) as json_file:
             json_data = json.load(json_file)
-        finally:
-            json_file.close()
     return json_data["dishGetHistory"]
+
 
 def history_ping_stats(filename, parse_samples, verbose=False):
     """Fetch, parse, and compute the packet loss stats.
@@ -66,18 +76,19 @@ def history_ping_stats(filename, parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 2 dicts, the first mapping general stat names
-        to their values and the second mapping ping drop run length stat names
-        to their values.
+        A tuple with 3 dicts, the first mapping general stat names to their
+        values, the second mapping ping drop stat names to their values and
+        the third mapping ping drop run length stat names to their values.
 
-        On failure, the tuple (None, None).
+    Raises:
+        JsonError: Failure to open, read, or parse JSON on input.
     """
     try:
         history = get_history(filename)
+    except ValueError as e:
+        raise JsonError("Failed to parse JSON: " + str(e))
     except Exception as e:
-        if verbose:
-            print("Failed getting history: " + str(e))
-        return None, None
+        raise JsonError(e)
 
     # "current" is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.
@@ -97,13 +108,13 @@ def history_ping_stats(filename, parse_samples, verbose=False):
     # index to next data sample after the newest one.
     offset = current % samples
 
-    tot = 0
+    tot = 0.0
     count_full_drop = 0
     count_unsched = 0
-    total_unsched_drop = 0
+    total_unsched_drop = 0.0
     count_full_unsched = 0
     count_obstruct = 0
-    total_obstruct_drop = 0
+    total_obstruct_drop = 0.0
     count_full_obstruct = 0
 
     second_runs = [0] * 60
@@ -123,9 +134,10 @@ def history_ping_stats(filename, parse_samples, verbose=False):
 
     for i in sample_range:
         d = history["popPingDropRate"][i]
-        tot += d
         if d >= 1:
-            count_full_drop += d
+            # just in case...
+            d = 1
+            count_full_drop += 1
             run_length += 1
         elif run_length > 0:
             if init_run_length is None:
@@ -134,7 +146,7 @@ def history_ping_stats(filename, parse_samples, verbose=False):
                 if run_length <= 60:
                     second_runs[run_length - 1] += run_length
                 else:
-                    minute_runs[min((run_length - 1)//60 - 1, 59)] += run_length
+                    minute_runs[min((run_length-1) // 60 - 1, 59)] += run_length
             run_length = 0
         elif init_run_length is None:
             init_run_length = 0
@@ -142,7 +154,7 @@ def history_ping_stats(filename, parse_samples, verbose=False):
             count_unsched += 1
             total_unsched_drop += d
             if d >= 1:
-                count_full_unsched += d
+                count_full_unsched += 1
         # scheduled=false and obstructed=true do not ever appear to overlap,
         # but in case they do in the future, treat that as just unscheduled
         # in order to avoid double-counting it.
@@ -150,7 +162,8 @@ def history_ping_stats(filename, parse_samples, verbose=False):
             count_obstruct += 1
             total_obstruct_drop += d
             if d >= 1:
-                count_full_obstruct += d
+                count_full_obstruct += 1
+        tot += d
 
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
@@ -162,6 +175,7 @@ def history_ping_stats(filename, parse_samples, verbose=False):
 
     return {
         "samples": parse_samples,
+    }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
         "count_obstructed": count_obstruct,
@@ -169,10 +183,10 @@ def history_ping_stats(filename, parse_samples, verbose=False):
         "count_full_obstructed_ping_drop": count_full_obstruct,
         "count_unscheduled": count_unsched,
         "total_unscheduled_ping_drop": total_unsched_drop,
-        "count_full_unscheduled_ping_drop": count_full_unsched
+        "count_full_unscheduled_ping_drop": count_full_unsched,
     }, {
         "init_run_fragment": init_run_length,
         "final_run_fragment": run_length,
         "run_seconds": second_runs,
-        "run_minutes": minute_runs
+        "run_minutes": minute_runs,
     }

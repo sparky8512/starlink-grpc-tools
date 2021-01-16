@@ -4,13 +4,17 @@ This module may eventually contain more expansive parsing logic, but for now
 it contains functions to parse the history data for some specific packet loss
 statistics.
 
-General ping drop (packet loss) statistics:
-    This group of statistics characterize the packet loss (labeled "ping drop"
-    in the field names of the Starlink gRPC service protocol) in various ways.
+General statistics:
+    This group of statistics contains data relevant to all the other groups.
 
     The sample interval is currently 1 second.
 
         samples: The number of valid samples analyzed.
+
+General ping drop (packet loss) statistics:
+    This group of statistics characterize the packet loss (labeled "ping drop"
+    in the field names of the Starlink gRPC service protocol) in various ways.
+
         total_ping_drop: The total amount of time, in sample intervals, that
             experienced ping drop.
         count_full_ping_drop: The number of samples that experienced 100%
@@ -62,13 +66,13 @@ Ping drop run length statistics:
 
     No sample should be counted in more than one of the run length stats or
     stat elements, so the total of all of them should be equal to
-    count_full_ping_drop from the general stats.
+    count_full_ping_drop from the ping drop stats.
 
     Samples that experience less than 100% ping drop are not counted in this
     group of stats, even if they happen at the beginning or end of a run of
     100% ping drop samples. To compute the amount of time that experienced
     ping loss in less than a single run of 100% ping drop, use
-    (total_ping_drop - count_full_ping_drop) from the general stats.
+    (total_ping_drop - count_full_ping_drop) from the ping drop stats.
 """
 
 from itertools import chain
@@ -78,15 +82,61 @@ import grpc
 import spacex.api.device.device_pb2
 import spacex.api.device.device_pb2_grpc
 
+
+class GrpcError(Exception):
+    """Provides error info when something went wrong with a gRPC call."""
+    def __init__(self, e, *args, **kwargs):
+        # grpc.RpcError is too verbose to print in whole, but it may also be
+        # a Call object, and that class has some minimally useful info.
+        if isinstance(e, grpc.Call):
+            msg = e.details()
+        elif isinstance(e, grpc.RpcError):
+            msg = "Unknown communication or service error"
+        else:
+            msg = str(e)
+        super().__init__(msg, *args, **kwargs)
+
+
+def get_status():
+    """Fetch status data and return it in grpc structure format.
+
+    Raises:
+        grpc.RpcError: Communication or service error.
+    """
+    with grpc.insecure_channel("192.168.100.1:9200") as channel:
+        stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
+    return response.dish_get_status
+
+
+def get_id():
+    """Return the ID from the dish status information.
+
+    Returns:
+        A string identifying the Starlink user terminal reachable from the
+        local network.
+
+    Raises:
+        GrpcError: No user terminal is currently reachable.
+    """
+    try:
+        status = get_status()
+        return status.device_info.id
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
     Returns:
-        A tuple with 2 lists, the first with general stat names and the
-        second with ping drop run length stat names.
+        A tuple with 3 lists, the first with general stat names, the second
+        with ping drop stat names, and the third with ping drop run length
+        stat names.
     """
     return [
         "samples",
+    ], [
         "total_ping_drop",
         "count_full_ping_drop",
         "count_obstructed",
@@ -94,13 +144,14 @@ def history_ping_field_names():
         "count_full_obstructed_ping_drop",
         "count_unscheduled",
         "total_unscheduled_ping_drop",
-        "count_full_unscheduled_ping_drop"
+        "count_full_unscheduled_ping_drop",
     ], [
         "init_run_fragment",
         "final_run_fragment",
         "run_seconds",
-        "run_minutes"
+        "run_minutes",
     ]
+
 
 def get_history():
     """Fetch history data and return it in grpc structure format.
@@ -113,6 +164,7 @@ def get_history():
         response = stub.Handle(spacex.api.device.device_pb2.Request(get_history={}))
     return response.dish_get_history
 
+
 def history_ping_stats(parse_samples, verbose=False):
     """Fetch, parse, and compute the packet loss stats.
 
@@ -122,19 +174,18 @@ def history_ping_stats(parse_samples, verbose=False):
         verbose (bool): Optionally produce verbose output.
 
     Returns:
-        On success, a tuple with 2 dicts, the first mapping general stat names
-        to their values and the second mapping ping drop run length stat names
-        to their values.
+        A tuple with 3 dicts, the first mapping general stat names to their
+        values, the second mapping ping drop stat names to their values and
+        the third mapping ping drop run length stat names to their values.
 
-        On failure, the tuple (None, None).
+    Raises:
+        GrpcError: Failed getting history info from the Starlink user
+            terminal.
     """
     try:
         history = get_history()
-    except grpc.RpcError:
-        if verbose:
-            # RpcError is too verbose to print the details.
-            print("Failed getting history")
-        return None, None
+    except grpc.RpcError as e:
+        raise GrpcError(e)
 
     # 'current' is the count of data samples written to the ring buffer,
     # irrespective of buffer wrap.
@@ -154,13 +205,13 @@ def history_ping_stats(parse_samples, verbose=False):
     # index to next data sample after the newest one.
     offset = current % samples
 
-    tot = 0
+    tot = 0.0
     count_full_drop = 0
     count_unsched = 0
-    total_unsched_drop = 0
+    total_unsched_drop = 0.0
     count_full_unsched = 0
     count_obstruct = 0
-    total_obstruct_drop = 0
+    total_obstruct_drop = 0.0
     count_full_obstruct = 0
 
     second_runs = [0] * 60
@@ -180,9 +231,10 @@ def history_ping_stats(parse_samples, verbose=False):
 
     for i in sample_range:
         d = history.pop_ping_drop_rate[i]
-        tot += d
         if d >= 1:
-            count_full_drop += d
+            # just in case...
+            d = 1
+            count_full_drop += 1
             run_length += 1
         elif run_length > 0:
             if init_run_length is None:
@@ -191,7 +243,7 @@ def history_ping_stats(parse_samples, verbose=False):
                 if run_length <= 60:
                     second_runs[run_length - 1] += run_length
                 else:
-                    minute_runs[min((run_length - 1)//60 - 1, 59)] += run_length
+                    minute_runs[min((run_length-1) // 60 - 1, 59)] += run_length
             run_length = 0
         elif init_run_length is None:
             init_run_length = 0
@@ -199,7 +251,7 @@ def history_ping_stats(parse_samples, verbose=False):
             count_unsched += 1
             total_unsched_drop += d
             if d >= 1:
-                count_full_unsched += d
+                count_full_unsched += 1
         # scheduled=false and obstructed=true do not ever appear to overlap,
         # but in case they do in the future, treat that as just unscheduled
         # in order to avoid double-counting it.
@@ -207,7 +259,8 @@ def history_ping_stats(parse_samples, verbose=False):
             count_obstruct += 1
             total_obstruct_drop += d
             if d >= 1:
-                count_full_obstruct += d
+                count_full_obstruct += 1
+        tot += d
 
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
@@ -219,6 +272,7 @@ def history_ping_stats(parse_samples, verbose=False):
 
     return {
         "samples": parse_samples,
+    }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
         "count_obstructed": count_obstruct,
@@ -226,10 +280,10 @@ def history_ping_stats(parse_samples, verbose=False):
         "count_full_obstructed_ping_drop": count_full_obstruct,
         "count_unscheduled": count_unsched,
         "total_unscheduled_ping_drop": total_unsched_drop,
-        "count_full_unscheduled_ping_drop": count_full_unsched
+        "count_full_unscheduled_ping_drop": count_full_unsched,
     }, {
         "init_run_fragment": init_run_length,
         "final_run_fragment": run_length,
         "run_seconds": second_runs,
-        "run_minutes": minute_runs
+        "run_minutes": minute_runs,
     }
