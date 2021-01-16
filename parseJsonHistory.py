@@ -89,7 +89,7 @@ try:
     g_stats, pd_stats, rl_stats = starlink_json.history_ping_stats(args[0] if args else "-",
                                                                    samples, verbose)
 except starlink_json.JsonError as e:
-    logging.error("Failure getting ping stats: " + str(e))
+    logging.error("Failure getting ping stats: %s", str(e))
     sys.exit(1)
 
 if verbose:

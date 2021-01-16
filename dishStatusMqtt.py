@@ -107,13 +107,13 @@ def main():
     gstate = GlobalState()
     gstate.dish_id = None
 
-    def conn_error(msg):
+    def conn_error(msg, *args):
         # Connection errors that happen in an interval loop are not critical
         # failures, but are interesting enough to print in non-verbose mode.
         if loop_time > 0:
-            print(msg)
+            print(msg % args)
         else:
-            logging.error(msg)
+            logging.error(msg, *args)
 
     def loop_body():
         try:
@@ -166,7 +166,7 @@ def main():
             if verbose:
                 print("Successfully published to MQTT broker")
         except Exception as e:
-            conn_error("Failed publishing to MQTT broker: " + str(e))
+            conn_error("Failed publishing to MQTT broker: %s", str(e))
             return 1
 
         return 0

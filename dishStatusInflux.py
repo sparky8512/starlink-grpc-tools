@@ -159,13 +159,13 @@ def main():
             tags = ["id"]
             retention_policy = rp
 
-    def conn_error(msg):
+    def conn_error(msg, *args):
         # Connection errors that happen in an interval loop are not critical
         # failures, but are interesting enough to print in non-verbose mode.
         if loop_time > 0:
-            print(msg)
+            print(msg % args)
         else:
-            logging.error(msg)
+            logging.error(msg, *args)
 
     def flush_pending(client):
         try:
@@ -174,7 +174,7 @@ def main():
                 print("Data points written: " + str(gstate.pending))
             gstate.pending = 0
         except Exception as e:
-            conn_error("Failed writing to InfluxDB database: " + str(e))
+            conn_error("Failed writing to InfluxDB database: %s", str(e))
             return 1
 
         return 0

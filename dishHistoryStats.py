@@ -98,7 +98,7 @@ def main():
         try:
             g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
         except starlink_grpc.GrpcError as e:
-            logging.error("Failure getting ping stats: " + str(e))
+            logging.error("Failure getting ping stats: %s", str(e))
             return 1
 
         if verbose:

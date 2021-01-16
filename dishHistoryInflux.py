@@ -152,13 +152,13 @@ def main():
     gstate.dish_id = None
     gstate.points = []
 
-    def conn_error(msg):
+    def conn_error(msg, *args):
         # Connection errors that happen in an interval loop are not critical
         # failures, but are interesting enough to print in non-verbose mode.
         if loop_time > 0:
-            print(msg)
+            print(msg % args)
         else:
-            logging.error(msg)
+            logging.error(msg, *args)
 
     def flush_points(client):
         try:
@@ -167,7 +167,7 @@ def main():
                 print("Data points written: " + str(len(gstate.points)))
                 gstate.points.clear()
         except Exception as e:
-            conn_error("Failed writing to InfluxDB database: " + str(e))
+            conn_error("Failed writing to InfluxDB database: %s", str(e))
             return 1
 
         return 0
@@ -179,7 +179,7 @@ def main():
                 if verbose:
                     print("Using dish ID: " + gstate.dish_id)
             except starlink_grpc.GrpcError as e:
-                conn_error("Failure getting dish ID: " + str(e))
+                conn_error("Failure getting dish ID: %s", str(e))
                 return 1
 
         timestamp = datetime.datetime.utcnow()
@@ -187,7 +187,7 @@ def main():
         try:
             g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
         except starlink_grpc.GrpcError as e:
-            conn_error("Failure getting ping stats: " + str(e))
+            conn_error("Failure getting ping stats: %s", str(e))
             return 1
 
         all_stats = g_stats.copy()
