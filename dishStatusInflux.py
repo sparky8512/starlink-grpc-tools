@@ -11,6 +11,7 @@
 import getopt
 import logging
 import os
+import signal
 import sys
 import time
 import warnings
@@ -21,6 +22,15 @@ from influxdb import SeriesHelper
 
 import spacex.api.device.device_pb2
 import spacex.api.device.device_pb2_grpc
+
+
+class Terminated(Exception):
+    pass
+
+
+def handle_sigterm(signum, frame):
+    # Turn SIGTERM into an exception so main loop can clean up
+    raise Terminated()
 
 
 def main():
@@ -244,6 +254,7 @@ def main():
         # user has explicitly said be insecure, so don't warn about it
         warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
+    signal.signal(signal.SIGTERM, handle_sigterm)
     influx_client = InfluxDBClient(**icargs)
     try:
         next_loop = time.monotonic()
@@ -255,6 +266,8 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
+    except Terminated:
+        pass
     finally:
         # Flush on error/exit
         if gstate.pending:
