@@ -5,6 +5,8 @@ For more information on what Starlink is, see [starlink.com](https://www.starlin
 
 ## Prerequisites
 
+Most of the scripts here are [Python](https://www.python.org/) scripts. To use them, you will either need Python installed on your system or you can use the Docker image. If you use the Docker image, you can skip the rest of the prerequisites other than making sure the dish IP is reachable and Docker itself. For Linux systems, the python package from your distribution should be fine, as long as it is Python 3. The JSON script should actually work with Python 2.7, but the grpc scripts all require Python 3 (and Python 2.7 is past end-of-life, so is not recommended anyway).
+
 `parseJsonHistory.py` operates on a JSON format data representation of the protocol buffer messages, such as that output by [gRPCurl](https://github.com/fullstorydev/grpcurl). The command lines below assume `grpcurl` is installed in the runtime PATH. If that's not the case, just substitute in the full path to the command.
 
 All the tools that pull data from the dish expect to be able to reach it at the dish's fixed IP address of 192.168.100.1, as do the Starlink [Android app](https://play.google.com/store/apps/details?id=com.starlink.mobile), [iOS app](https://apps.apple.com/us/app/starlink/id1537177988), and the browser app you can run directly from http://192.168.100.1. When using a router other than the one included with the Starlink installation kit, this usually requires some additional router configuration to make it work. That configuration is beyond the scope of this document, but if the Starlink app doesn't work on your home network, then neither will these scripts. That being said, you do not need the Starlink app installed to make use of these scripts.
@@ -14,6 +16,8 @@ The scripts that don't use `grpcurl` to pull data require the `grpcio` Python pa
 The scripts that use [MQTT](https://mqtt.org/) for output require the `paho-mqtt` Python package. Information about how to install that can be found at https://www.eclipse.org/paho/index.php?page=clients/python/index.php
 
 The scripts that use [InfluxDB](https://www.influxdata.com/products/influxdb/) for output require the `influxdb` Python package. Information about how to install that can be found at https://github.com/influxdata/influxdb-python. Note that this is the (slightly) older version of the InfluxDB client Python module, not the InfluxDB 2.0 client. It can still be made to work with an InfluxDB 2.0 server, but doing so requires using `influx v1` [CLI commands](https://docs.influxdata.com/influxdb/v2.0/reference/cli/influx/v1/) on the server to map the 1.x username, password, and database names to their 2.0 equivalents.
+
+Running the scripts within a [Docker](https://www.docker.com/) container requires Docker to be installed. Information about how to install that can be found at https://docs.docker.com/engine/install/
 
 ## Usage
 
@@ -49,7 +53,7 @@ python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=.
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi.proto
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi_config.proto
 ```
-Then move the resulting files to where the Python scripts can find them in its import path, such as in the same directory as the scripts themselves.
+Then move the resulting files to where the Python scripts can find them in the import path, such as in the same directory as the scripts themselves.
 
 Once those are available, the `dishHistoryStats.py` script can be used in place of the `grpcurl | parseJsonHistory.py` pipeline, with most of the same command line options. For example:
 ```
@@ -69,7 +73,7 @@ To collect and record summary stats at the top of every hour, you could put some
 
 By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```
-python3 dishStatusInflux.py -t 30 [... probably other args to specifiy server options ...] 
+python3 dishStatusInflux.py -t 30 [... probably other args to specify server options ...] 
 ```
 
 Some of the scripts (currently only the InfluxDB ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
@@ -101,7 +105,7 @@ The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 90
 Initialization of the container can be performed with the following command:
 
 ```
-docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
+docker run -d -t --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
     -e INFLUXDB_PORT={Port, 8086 usually} \
     -e INFLUXDB_USER={Optional, InfluxDB Username} \
     -e INFLUXDB_PWD={Optional, InfluxDB Password} \
@@ -109,6 +113,10 @@ docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} 
     neurocis/starlink-grpc-tools dishStatusInflux.py -v
 ```
 
-`dishStatusInflux.py -v` is optional and will run same but not -verbose, or you can replace it with one of the other scripts if you wish to run that instead. There is also an `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
+The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
+
+The `dishStatusInflux.py -v` is optional and omitting it will run same but not verbose, or you can replace it with one of the other scripts if you wish to run that instead, or use other command line options. There is also a `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
 
 ![image](https://user-images.githubusercontent.com/945191/104257179-ae570000-5431-11eb-986e-3fedd04bfcfb.png)
+
+You'll probably want to run with the `-t` option to `dishStatusInflux.py` to collect status information periodically for this to be meaningful.

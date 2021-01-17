@@ -14,6 +14,7 @@ import getopt
 import datetime
 import logging
 import os
+import signal
 import sys
 import time
 import warnings
@@ -21,6 +22,15 @@ import warnings
 from influxdb import InfluxDBClient
 
 import starlink_grpc
+
+
+class Terminated(Exception):
+    pass
+
+
+def handle_sigterm(signum, frame):
+    # Turn SIGTERM into an exception so main loop can clean up
+    raise Terminated()
 
 
 def main():
@@ -220,6 +230,7 @@ def main():
         # user has explicitly said be insecure, so don't warn about it
         warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
+    signal.signal(signal.SIGTERM, handle_sigterm)
     influx_client = InfluxDBClient(**icargs)
     try:
         next_loop = time.monotonic()
@@ -231,6 +242,8 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
+    except Terminated:
+        pass
     finally:
         if gstate.points:
             rc = flush_points(influx_client)
