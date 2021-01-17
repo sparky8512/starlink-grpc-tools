@@ -19,7 +19,7 @@ WORKDIR /app
 
 # run crond as main process of container
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
-CMD ["dishStatusInflux.py", "-t", "30"]
+CMD ["dishStatusInflux.py"]
 
 # docker run -d --name='starlink-grpc-tools' -e INFLUXDB_HOST=192.168.1.34 -e INFLUXDB_PORT=8086 -e INFLUXDB_DB=starlink
-# --net='br0' --ip='192.168.1.39' neurocis/starlink-grpc-tools dishStatusInflux.py -t 30
+# --net='br0' --ip='192.168.1.39' neurocis/starlink-grpc-tools dishStatusInflux.py

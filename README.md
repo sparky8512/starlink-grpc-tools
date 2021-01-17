@@ -110,11 +110,13 @@ docker run -d -t --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostnam
     -e INFLUXDB_USER={Optional, InfluxDB Username} \
     -e INFLUXDB_PWD={Optional, InfluxDB Password} \
     -e INFLUXDB_DB={Pre-created DB name, starlinkstats works well} \
-    neurocis/starlink-grpc-tools dishStatusInflux.py -v -t 30
+    neurocis/starlink-grpc-tools dishStatusInflux.py -v
 ```
 
 The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
 
-The `dishStatusInflux.py -v -t 30` is optional and omitting it will run same but not verbose, or you can replace it with one of the other scripts if you wish to run that instead, or use other command line options. There is also a `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
+The `dishStatusInflux.py -v` is optional and omitting it will run same but not verbose, or you can replace it with one of the other scripts if you wish to run that instead, or use other command line options. There is also a `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
 
 ![image](https://user-images.githubusercontent.com/945191/104257179-ae570000-5431-11eb-986e-3fedd04bfcfb.png)
+
+You'll probably want to run with the `-t` option to `dishStatusInflux.py` to collect status information periodically for this to be meaningful.
