@@ -108,6 +108,7 @@ def get_status():
         response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
     return response.dish_get_status
 
+
 def get_id():
     """Return the ID from the dish status information.
 
@@ -124,6 +125,7 @@ def get_id():
     except grpc.RpcError as e:
         raise GrpcError(e)
 
+
 def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
@@ -133,7 +135,7 @@ def history_ping_field_names():
         stat names.
     """
     return [
-        "samples"
+        "samples",
     ], [
         "total_ping_drop",
         "count_full_ping_drop",
@@ -142,13 +144,14 @@ def history_ping_field_names():
         "count_full_obstructed_ping_drop",
         "count_unscheduled",
         "total_unscheduled_ping_drop",
-        "count_full_unscheduled_ping_drop"
+        "count_full_unscheduled_ping_drop",
     ], [
         "init_run_fragment",
         "final_run_fragment",
         "run_seconds",
-        "run_minutes"
+        "run_minutes",
     ]
+
 
 def get_history():
     """Fetch history data and return it in grpc structure format.
@@ -160,6 +163,7 @@ def get_history():
         stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
         response = stub.Handle(spacex.api.device.device_pb2.Request(get_history={}))
     return response.dish_get_history
+
 
 def history_ping_stats(parse_samples, verbose=False):
     """Fetch, parse, and compute the packet loss stats.
@@ -239,7 +243,7 @@ def history_ping_stats(parse_samples, verbose=False):
                 if run_length <= 60:
                     second_runs[run_length - 1] += run_length
                 else:
-                    minute_runs[min((run_length - 1)//60 - 1, 59)] += run_length
+                    minute_runs[min((run_length-1) // 60 - 1, 59)] += run_length
             run_length = 0
         elif init_run_length is None:
             init_run_length = 0
@@ -267,7 +271,7 @@ def history_ping_stats(parse_samples, verbose=False):
         run_length = 0
 
     return {
-        "samples": parse_samples
+        "samples": parse_samples,
     }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
@@ -276,10 +280,10 @@ def history_ping_stats(parse_samples, verbose=False):
         "count_full_obstructed_ping_drop": count_full_obstruct,
         "count_unscheduled": count_unsched,
         "total_unscheduled_ping_drop": total_unsched_drop,
-        "count_full_unscheduled_ping_drop": count_full_unsched
+        "count_full_unscheduled_ping_drop": count_full_unsched,
     }, {
         "init_run_fragment": init_run_length,
         "final_run_fragment": run_length,
         "run_seconds": second_runs,
-        "run_minutes": minute_runs
+        "run_minutes": minute_runs,
     }
