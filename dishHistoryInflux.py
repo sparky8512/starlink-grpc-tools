@@ -37,7 +37,7 @@ def main():
     arg_error = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "ahn:p:rs:t:vC:D:IP:R:SU:")
+        opts, args = getopt.getopt(sys.argv[1:], "abhn:p:rs:t:vC:D:IP:R:SU:")
     except getopt.GetoptError as err:
         print(str(err))
         arg_error = True
@@ -49,6 +49,7 @@ def main():
     verbose = False
     default_loop_time = 0
     loop_time = default_loop_time
+    bulk_mode = False
     run_lengths = False
     host_default = "localhost"
     database_default = "starlinkstats"
@@ -92,6 +93,8 @@ def main():
             for opt, arg in opts:
                 if opt == "-a":
                     samples = -1
+                elif opt == "-b":
+                    bulk_mode = True
                 elif opt == "-h":
                     print_usage = True
                 elif opt == "-n":
@@ -132,6 +135,7 @@ def main():
         print("Usage: " + sys.argv[0] + " [options...]")
         print("Options:")
         print("    -a: Parse all valid samples")
+        print("    -b: Bulk mode: write individual sample data instead of summary stats")
         print("    -h: Be helpful")
         print("    -n <name>: Hostname of InfluxDB server, default: " + host_default)
         print("    -p <num>: Port number to use on InfluxDB server")
@@ -182,25 +186,28 @@ def main():
 
         return 0
 
-    def loop_body(client):
-        if gstate.dish_id is None:
-            try:
-                gstate.dish_id = starlink_grpc.get_id()
-                if verbose:
-                    print("Using dish ID: " + gstate.dish_id)
-            except starlink_grpc.GrpcError as e:
-                conn_error("Failure getting dish ID: %s", str(e))
-                return 1
-
+    def process_bulk_data():
         timestamp = datetime.datetime.utcnow()
 
-        try:
-            g_stats, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
-        except starlink_grpc.GrpcError as e:
-            conn_error("Failure getting ping stats: %s", str(e))
-            return 1
+        general, bulk = starlink_grpc.history_bulk_data(samples, verbose)
 
-        all_stats = g_stats.copy()
+        parsed_samples = general["samples"]
+        for i in range(parsed_samples):
+            gstate.points.append({
+                "measurement": "spacex.starlink.user_terminal.history",
+                "tags": {
+                    "id": gstate.dish_id
+                },
+                "time": timestamp + datetime.timedelta(seconds=i - parsed_samples),
+                "fields": {k: v[i] for k, v in bulk.items()},
+            })
+
+    def process_ping_stats():
+        timestamp = datetime.datetime.utcnow()
+
+        general, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
+
+        all_stats = general.copy()
         all_stats.update(pd_stats)
         if run_lengths:
             for k, v in rl_stats.items():
@@ -218,6 +225,30 @@ def main():
             "time": timestamp,
             "fields": all_stats,
         })
+
+    def loop_body(client):
+        if gstate.dish_id is None:
+            try:
+                gstate.dish_id = starlink_grpc.get_id()
+                if verbose:
+                    print("Using dish ID: " + gstate.dish_id)
+            except starlink_grpc.GrpcError as e:
+                conn_error("Failure getting dish ID: %s", str(e))
+                return 1
+
+        if bulk_mode:
+            try:
+                process_bulk_data()
+            except starlink_grpc.GrpcError as e:
+                conn_error("Failure getting history: %s", str(e))
+                return 1
+        else:
+            try:
+                process_ping_stats()
+            except starlink_grpc.GrpcError as e:
+                conn_error("Failure getting ping stats: %s", str(e))
+                return 1
+
         if verbose:
             print("Data points queued: " + str(len(gstate.points)))
 

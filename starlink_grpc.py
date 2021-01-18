@@ -10,6 +10,11 @@ General statistics:
     The sample interval is currently 1 second.
 
         samples: The number of valid samples analyzed.
+        current: XXX explain
+
+Bulk history data:
+    XXX to be written, but it'll be same as some of the items in status info,
+    just as lists for each.
 
 General ping drop (packet loss) statistics:
     This group of statistics characterize the packet loss (labeled "ping drop"
@@ -136,6 +141,7 @@ def history_ping_field_names():
     """
     return [
         "samples",
+        "current",
     ], [
         "total_ping_drop",
         "count_full_ping_drop",
@@ -165,6 +171,77 @@ def get_history():
     return response.dish_get_history
 
 
+def compute_sample_range(history, parse_samples, verbose=False):
+    # 'current' is the count of data samples written to the ring buffer,
+    # irrespective of buffer wrap.
+    current = int(history.current)
+    samples = len(history.pop_ping_drop_rate)
+
+    if verbose:
+        print("current counter:       " + str(current))
+        print("All samples:           " + str(samples))
+
+    samples = min(samples, current)
+
+    if verbose:
+        print("Valid samples:         " + str(samples))
+
+    # This is ring buffer offset, so both index to oldest data sample and
+    # index to next data sample after the newest one.
+    offset = current % samples
+
+    if parse_samples < 0 or samples < parse_samples:
+        parse_samples = samples
+
+    # Parse the most recent parse_samples-sized set of samples. This will
+    # iterate samples in order from oldest to newest.
+    if parse_samples <= offset:
+        sample_range = range(offset - parse_samples, offset)
+    else:
+        sample_range = chain(range(samples + offset - parse_samples, samples), range(0, offset))
+
+    return sample_range, parse_samples, current
+
+
+def history_bulk_data(parse_samples, verbose=False):
+    try:
+        history = get_history()
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+    sample_range, parse_samples, current = compute_sample_range(history, parse_samples, verbose)
+
+    pop_ping_drop_rate = []
+    pop_ping_latency_ms = []
+    downlink_throughput_bps = []
+    uplink_throughput_bps = []
+    snr = []
+    scheduled = []
+    obstructed = []
+
+    for i in sample_range:
+        pop_ping_drop_rate.append(history.pop_ping_drop_rate[i])
+        pop_ping_latency_ms.append(history.pop_ping_latency_ms[i])
+        downlink_throughput_bps.append(history.downlink_throughput_bps[i])
+        uplink_throughput_bps.append(history.uplink_throughput_bps[i])
+        snr.append(history.snr[i])
+        scheduled.append(history.scheduled[i])
+        obstructed.append(history.obstructed[i])
+
+    return {
+        "samples": parse_samples,
+        "current": current,
+    }, {
+        "pop_ping_drop_rate": pop_ping_drop_rate,
+        "pop_ping_latency_ms": pop_ping_latency_ms,
+        "downlink_throughput_bps": downlink_throughput_bps,
+        "uplink_throughput_bps": uplink_throughput_bps,
+        "snr": snr,
+        "scheduled": scheduled,
+        "obstructed": obstructed,
+    }
+
+
 def history_ping_stats(parse_samples, verbose=False):
     """Fetch, parse, and compute the packet loss stats.
 
@@ -187,23 +264,7 @@ def history_ping_stats(parse_samples, verbose=False):
     except grpc.RpcError as e:
         raise GrpcError(e)
 
-    # 'current' is the count of data samples written to the ring buffer,
-    # irrespective of buffer wrap.
-    current = int(history.current)
-    samples = len(history.pop_ping_drop_rate)
-
-    if verbose:
-        print("current counter:       " + str(current))
-        print("All samples:           " + str(samples))
-
-    samples = min(samples, current)
-
-    if verbose:
-        print("Valid samples:         " + str(samples))
-
-    # This is ring buffer offset, so both index to oldest data sample and
-    # index to next data sample after the newest one.
-    offset = current % samples
+    sample_range, parse_samples, current = compute_sample_range(history, parse_samples, verbose)
 
     tot = 0.0
     count_full_drop = 0
@@ -218,16 +279,6 @@ def history_ping_stats(parse_samples, verbose=False):
     minute_runs = [0] * 60
     run_length = 0
     init_run_length = None
-
-    if parse_samples < 0 or samples < parse_samples:
-        parse_samples = samples
-
-    # Parse the most recent parse_samples-sized set of samples. This will
-    # iterate samples in order from oldest to newest.
-    if parse_samples <= offset:
-        sample_range = range(offset - parse_samples, offset)
-    else:
-        sample_range = chain(range(samples + offset - parse_samples, samples), range(0, offset))
 
     for i in sample_range:
         d = history.pop_ping_drop_rate[i]
@@ -272,6 +323,7 @@ def history_ping_stats(parse_samples, verbose=False):
 
     return {
         "samples": parse_samples,
+        "current": current,
     }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
