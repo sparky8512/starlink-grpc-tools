@@ -1,17 +1,25 @@
 #!/usr/bin/python3
 ######################################################################
 #
-# Write Starlink user terminal packet loss statistics to an InfluxDB
-# database.
+# Write Starlink user terminal packet loss, latency, and usage data
+# to an InfluxDB database.
 #
 # This script examines the most recent samples from the history data,
-# computes several different metrics related to packet loss, and
-# writes those to the specified InfluxDB database.
+# and either writes them in whole, or computes several different
+# metrics related to packet loss and writes those, to the specified
+# InfluxDB database.
+#
+# NOTE: The Starlink user terminal does not include time values with
+# its history or status data, so this script uses current system time
+# to compute the timestamps it sends to InfluxDB. It is recommended
+# to run this script on a host that has its system clock synced via
+# NTP. Otherwise, the timestamps may get out of sync with real time.
 #
 ######################################################################
 
 import getopt
-import datetime
+from datetime import datetime
+from datetime import timezone
 import logging
 import os
 import signal
@@ -140,8 +148,9 @@ def main():
         print("    -n <name>: Hostname of InfluxDB server, default: " + host_default)
         print("    -p <num>: Port number to use on InfluxDB server")
         print("    -r: Include ping drop run length stats")
-        print("    -s <num>: Number of data samples to parse, default: loop interval,")
-        print("              if set, else " + str(samples_default))
+        print("    -s <num>: Number of data samples to parse; in bulk mode, applies to first")
+        print("              loop iteration only, default: loop interval, if set, else " +
+              str(samples_default))
         print("    -t <num>: Loop interval in seconds or 0 for no loop, default: " +
               str(default_loop_time))
         print("    -v: Be verbose")
@@ -165,6 +174,8 @@ def main():
     gstate = GlobalState()
     gstate.dish_id = None
     gstate.points = []
+    gstate.counter = None
+    gstate.timestamp = None
 
     def conn_error(msg, *args):
         # Connection errors that happen in an interval loop are not critical
@@ -187,23 +198,39 @@ def main():
         return 0
 
     def process_bulk_data():
-        timestamp = datetime.datetime.utcnow()
+        # need to pull this now in case it is needed later
+        now = time.time()
 
-        general, bulk = starlink_grpc.history_bulk_data(samples, verbose)
+        start = gstate.counter
+        parse_samples = samples if start is None else -1
+        general, bulk = starlink_grpc.history_bulk_data(parse_samples, start=start, verbose=verbose)
 
         parsed_samples = general["samples"]
+        new_counter = general["current"]
+        timestamp = gstate.timestamp
+        if timestamp is None or new_counter != gstate.counter + parsed_samples:
+            timestamp = now
+            if verbose:
+                print("Establishing new time base: " + str(new_counter) + " -> " +
+                      str(datetime.fromtimestamp(timestamp, tz=timezone.utc)))
+                timestamp -= parsed_samples
+
         for i in range(parsed_samples):
             gstate.points.append({
                 "measurement": "spacex.starlink.user_terminal.history",
                 "tags": {
                     "id": gstate.dish_id
                 },
-                "time": timestamp + datetime.timedelta(seconds=i - parsed_samples),
-                "fields": {k: v[i] for k, v in bulk.items()},
+                "time": datetime.utcfromtimestamp(timestamp),
+                "fields": {k: v[i] for k, v in bulk.items() if v[i] is not None},
             })
+            timestamp += 1
+
+        gstate.counter = new_counter
+        gstate.timestamp = timestamp
 
     def process_ping_stats():
-        timestamp = datetime.datetime.utcnow()
+        timestamp = time.time()
 
         general, pd_stats, rl_stats = starlink_grpc.history_ping_stats(samples, verbose)
 
@@ -222,7 +249,7 @@ def main():
             "tags": {
                 "id": gstate.dish_id
             },
-            "time": timestamp,
+            "time": datetime.utcfromtimestamp(timestamp),
             "fields": all_stats,
         })
 
