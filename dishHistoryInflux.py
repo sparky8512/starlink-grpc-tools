@@ -230,7 +230,7 @@ def main():
             if verbose:
                 print("Establishing new time base: " + str(new_counter) + " -> " +
                       str(datetime.fromtimestamp(timestamp, tz=timezone.utc)))
-                timestamp -= parsed_samples
+            timestamp -= parsed_samples
 
         for i in range(parsed_samples):
             gstate.points.append({
