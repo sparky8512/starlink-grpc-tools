@@ -17,6 +17,8 @@ The scripts that use [MQTT](https://mqtt.org/) for output require the `paho-mqtt
 
 The scripts that use [InfluxDB](https://www.influxdata.com/products/influxdb/) for output require the `influxdb` Python package. Information about how to install that can be found at https://github.com/influxdata/influxdb-python. Note that this is the (slightly) older version of the InfluxDB client Python module, not the InfluxDB 2.0 client. It can still be made to work with an InfluxDB 2.0 server, but doing so requires using `influx v1` [CLI commands](https://docs.influxdata.com/influxdb/v2.0/reference/cli/influx/v1/) on the server to map the 1.x username, password, and database names to their 2.0 equivalents.
 
+Note that the Python package versions available from various Linux distributions (ie: installed via `apt-get` or similar) tend to run a bit behind those available to install via `pip`. While the distro packages should work OK as long as they aren't extremely old, they may not work as well as the later versions.
+
 Running the scripts within a [Docker](https://www.docker.com/) container requires Docker to be installed. Information about how to install that can be found at https://docs.docker.com/engine/install/
 
 ## Usage
@@ -77,6 +79,10 @@ python3 dishStatusInflux.py -t 30 [... probably other args to specify server opt
 ```
 
 Some of the scripts (currently only the InfluxDB ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
+
+#### Bulk history data collection
+
+`dishStatusInflux.py` also supports a bulk mode that collects and writes the full second-by-second data to the server instead of summary stats. To select bulk mode, use the `-b` option. You'll probably also want to use the `-t` option to have it run in a loop.
 
 ### Other scripts
 
