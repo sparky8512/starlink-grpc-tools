@@ -1,15 +1,55 @@
 """Helpers for grpc communication with a Starlink user terminal.
 
 This module may eventually contain more expansive parsing logic, but for now
-it contains functions to parse the history data for some specific packet loss
-statistics.
+it contains functions to either get the history data as-is or parse it for
+some specific packet loss statistics.
 
-General statistics:
-    This group of statistics contains data relevant to all the other groups.
+Those functions return data grouped into sets, as follows:
+
+General data:
+    This set of fields contains data relevant to all the other groups.
 
     The sample interval is currently 1 second.
 
-        samples: The number of valid samples analyzed.
+        samples: The number of samples analyzed (for statistics) or returned
+            (for bulk data).
+        end_counter: The total number of data samples that have been written to
+            the history buffer since dish reboot, irrespective of buffer wrap.
+            This can be used to keep track of how many samples are new in
+            comparison to a prior query of the history data.
+
+Bulk history data:
+    This group holds the history data as-is for the requested range of
+    samples, just unwound from the circular buffers that the raw data holds.
+    It contains some of the same fields as the status info, but instead of
+    representing the current values, each field contains a sequence of values
+    representing the value over time, ending at the current time.
+
+        pop_ping_drop_rate: Fraction of lost ping replies per sample.
+        pop_ping_latency_ms: Round trip time, in milliseconds, during the
+            sample period, or None if a sample experienced 100% ping drop.
+        downlink_throughput_bps: Download usage during the sample period
+            (actual, not max available), in bits per second.
+        uplink_throughput_bps: Upload usage during the sample period, in bits
+            per second.
+        snr: Signal to noise ratio during the sample period.
+        scheduled: Boolean indicating whether or not a satellite was scheduled
+            to be available for transmit/receive during the sample period.
+            When false, ping drop shows as "No satellites" in Starlink app.
+        obstructed: Boolean indicating whether or not the dish determined the
+            signal between it and the satellite was obstructed during the
+            sample period. When true, ping drop shows as "Obstructed" in the
+            Starlink app.
+
+    There is no specific data field in the raw history data that directly
+    correlates with "Other" or "Beta downtime" in the Starlink app (or
+    whatever it gets renamed to after beta), but empirical evidence suggests
+    any sample where pop_ping_drop_rate is 1, scheduled is true, and
+    obstructed is false is counted as "Beta downtime".
+
+    Note that neither scheduled=false nor obstructed=true necessarily means
+    packet loss occurred. Those need to be examined in combination with
+    pop_ping_drop_rate to be meaningful.
 
 General ping drop (packet loss) statistics:
     This group of statistics characterize the packet loss (labeled "ping drop"
@@ -50,18 +90,18 @@ Ping drop run length statistics:
             end of the sample set that experienced 100% ping drop. This
             period may continue as a run beyond the end of the sample set, so
             is not counted in the following stats.
-        run_seconds: A 60 element list. Each element records the total amount
-            of time, in sample intervals, that experienced 100% ping drop in
-            a consecutive run that lasted for (list index + 1) sample
+        run_seconds: A 60 element sequence. Each element records the total
+            amount of time, in sample intervals, that experienced 100% ping
+            drop in a consecutive run that lasted for (index + 1) sample
             intervals (seconds). That is, the first element contains time
             spent in 1 sample runs, the second element contains time spent in
             2 sample runs, etc.
-        run_minutes: A 60 element list. Each element records the total amount
-            of time, in sample intervals, that experienced 100% ping drop in
-            a consecutive run that lasted for more that (list index + 1)
+        run_minutes: A 60 element sequence. Each element records the total
+            amount of time, in sample intervals, that experienced 100% ping
+            drop in a consecutive run that lasted for more that (index + 1)
             multiples of 60 sample intervals (minutes), but less than or equal
-            to (list index + 2) multiples of 60 sample intervals. Except for
-            the last element in the list, which records the total amount of
+            to (index + 2) multiples of 60 sample intervals. Except for the
+            last element in the sequence, which records the total amount of
             time in runs of more than 60*60 samples.
 
     No sample should be counted in more than one of the run length stats or
@@ -130,12 +170,13 @@ def history_ping_field_names():
     """Return the field names of the packet loss stats.
 
     Returns:
-        A tuple with 3 lists, the first with general stat names, the second
+        A tuple with 3 lists, the first with general data names, the second
         with ping drop stat names, and the third with ping drop run length
         stat names.
     """
     return [
         "samples",
+        "end_counter",
     ], [
         "total_ping_drop",
         "count_full_ping_drop",
@@ -165,30 +206,7 @@ def get_history():
     return response.dish_get_history
 
 
-def history_ping_stats(parse_samples, verbose=False):
-    """Fetch, parse, and compute the packet loss stats.
-
-    Args:
-        parse_samples (int): Number of samples to process, or -1 to parse all
-            available samples.
-        verbose (bool): Optionally produce verbose output.
-
-    Returns:
-        A tuple with 3 dicts, the first mapping general stat names to their
-        values, the second mapping ping drop stat names to their values and
-        the third mapping ping drop run length stat names to their values.
-
-    Raises:
-        GrpcError: Failed getting history info from the Starlink user
-            terminal.
-    """
-    try:
-        history = get_history()
-    except grpc.RpcError as e:
-        raise GrpcError(e)
-
-    # 'current' is the count of data samples written to the ring buffer,
-    # irrespective of buffer wrap.
+def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     current = int(history.current)
     samples = len(history.pop_ping_drop_rate)
 
@@ -201,9 +219,126 @@ def history_ping_stats(parse_samples, verbose=False):
     if verbose:
         print("Valid samples:         " + str(samples))
 
+    if parse_samples < 0 or samples < parse_samples:
+        parse_samples = samples
+
+    if start is not None and start > current:
+        if verbose:
+            print("Counter reset detected, ignoring requested start count")
+        start = None
+
+    if start is None or start < current - parse_samples:
+        start = current - parse_samples
+
     # This is ring buffer offset, so both index to oldest data sample and
     # index to next data sample after the newest one.
-    offset = current % samples
+    end_offset = current % samples
+    start_offset = start % samples
+
+    # Set the range for the requested set of samples. This will iterate
+    # sample index in order from oldest to newest.
+    if start_offset < end_offset:
+        sample_range = range(start_offset, end_offset)
+    else:
+        sample_range = chain(range(start_offset, samples), range(0, end_offset))
+
+    return sample_range, current - start, current
+
+
+def history_bulk_data(parse_samples, start=None, verbose=False):
+    """Fetch history data for a range of samples.
+
+    Args:
+        parse_samples (int): Number of samples to process, or -1 to parse all
+            available samples (bounded by start, if it is set).
+        start (int): Optional. If set, the samples returned will be limited to
+            the ones that have a counter value greater than this value. The
+            "end_counter" field in the general data dict returned by this
+            function represents the counter value of the last data sample
+            returned, so if that value is passed as start in a subsequent call
+            to this function, only new samples will be returned.
+            NOTE: The sample counter will reset to 0 when the dish reboots. If
+            the requested start value is greater than the new "end_counter"
+            value, this function will assume that happened and treat all
+            samples as being later than the requested start, and thus include
+            them (bounded by parse_samples, if it is not -1).
+        verbose (bool): Optionally produce verbose output.
+
+    Returns:
+        A tuple with 2 dicts, the first mapping general data names to their
+        values and the second mapping bulk history data names to their values.
+
+    Raises:
+        GrpcError: Failed getting history info from the Starlink user
+            terminal.
+    """
+    try:
+        history = get_history()
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+    sample_range, parsed_samples, current = _compute_sample_range(history,
+                                                                  parse_samples,
+                                                                  start=start,
+                                                                  verbose=verbose)
+
+    pop_ping_drop_rate = []
+    pop_ping_latency_ms = []
+    downlink_throughput_bps = []
+    uplink_throughput_bps = []
+    snr = []
+    scheduled = []
+    obstructed = []
+
+    for i in sample_range:
+        pop_ping_drop_rate.append(history.pop_ping_drop_rate[i])
+        pop_ping_latency_ms.append(
+            history.pop_ping_latency_ms[i] if history.pop_ping_drop_rate[i] < 1 else None)
+        downlink_throughput_bps.append(history.downlink_throughput_bps[i])
+        uplink_throughput_bps.append(history.uplink_throughput_bps[i])
+        snr.append(history.snr[i])
+        scheduled.append(history.scheduled[i])
+        obstructed.append(history.obstructed[i])
+
+    return {
+        "samples": parsed_samples,
+        "end_counter": current,
+    }, {
+        "pop_ping_drop_rate": pop_ping_drop_rate,
+        "pop_ping_latency_ms": pop_ping_latency_ms,
+        "downlink_throughput_bps": downlink_throughput_bps,
+        "uplink_throughput_bps": uplink_throughput_bps,
+        "snr": snr,
+        "scheduled": scheduled,
+        "obstructed": obstructed,
+    }
+
+
+def history_ping_stats(parse_samples, verbose=False):
+    """Fetch, parse, and compute the packet loss stats.
+
+    Args:
+        parse_samples (int): Number of samples to process, or -1 to parse all
+            available samples.
+        verbose (bool): Optionally produce verbose output.
+
+    Returns:
+        A tuple with 3 dicts, the first mapping general data names to their
+        values, the second mapping ping drop stat names to their values and
+        the third mapping ping drop run length stat names to their values.
+
+    Raises:
+        GrpcError: Failed getting history info from the Starlink user
+            terminal.
+    """
+    try:
+        history = get_history()
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+    sample_range, parse_samples, current = _compute_sample_range(history,
+                                                                 parse_samples,
+                                                                 verbose=verbose)
 
     tot = 0.0
     count_full_drop = 0
@@ -218,16 +353,6 @@ def history_ping_stats(parse_samples, verbose=False):
     minute_runs = [0] * 60
     run_length = 0
     init_run_length = None
-
-    if parse_samples < 0 or samples < parse_samples:
-        parse_samples = samples
-
-    # Parse the most recent parse_samples-sized set of samples. This will
-    # iterate samples in order from oldest to newest.
-    if parse_samples <= offset:
-        sample_range = range(offset - parse_samples, offset)
-    else:
-        sample_range = chain(range(samples + offset - parse_samples, samples), range(0, offset))
 
     for i in sample_range:
         d = history.pop_ping_drop_rate[i]
@@ -272,6 +397,7 @@ def history_ping_stats(parse_samples, verbose=False):
 
     return {
         "samples": parse_samples,
+        "end_counter": current,
     }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
