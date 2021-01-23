@@ -260,7 +260,7 @@ def main():
 
         after = time.time()
         parsed_samples = general["samples"]
-        new_counter = general["current"]
+        new_counter = general["end_counter"]
         timestamp = gstate.timestamp
         # check this first, so it doesn't report as lost time sync
         if gstate.counter is not None and new_counter != gstate.counter + parsed_samples:

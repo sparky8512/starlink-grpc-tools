@@ -13,7 +13,7 @@ General data:
 
         samples: The number of samples analyzed (for statistics) or returned
             (for bulk data).
-        current: The total number of data samples that have been written to
+        end_counter: The total number of data samples that have been written to
             the history buffer since dish reboot, irrespective of buffer wrap.
             This can be used to keep track of how many samples are new in
             comparison to a prior query of the history data.
@@ -176,7 +176,7 @@ def history_ping_field_names():
     """
     return [
         "samples",
-        "current",
+        "end_counter",
     ], [
         "total_ping_drop",
         "count_full_ping_drop",
@@ -252,20 +252,16 @@ def history_bulk_data(parse_samples, start=None, verbose=False):
         parse_samples (int): Number of samples to process, or -1 to parse all
             available samples (bounded by start, if it is set).
         start (int): Optional. If set, the samples returned will be limited to
-            the ones that have a counter value greater than or equal to this
-            value. The "current" field in the general data dict returned by
-            this function represents the counter value of the next data sample
-            after the returned data, so if that value is passed as start in a
-            subsequent call to this function, only new samples will be
-            returned.
+            the ones that have a counter value greater than this value. The
+            "end_counter" field in the general data dict returned by this
+            function represents the counter value of the last data sample
+            returned, so if that value is passed as start in a subsequent call
+            to this function, only new samples will be returned.
             NOTE: The sample counter will reset to 0 when the dish reboots. If
-            the requested start value is greater than the current "current"
+            the requested start value is greater than the new "end_counter"
             value, this function will assume that happened and treat all
             samples as being later than the requested start, and thus include
             them (bounded by parse_samples, if it is not -1).
-            Combining parse_samples=-1 and setting start to other than None is
-            not recommended, as doing so will not guarantee that all new
-            samples are included in the results.
         verbose (bool): Optionally produce verbose output.
 
     Returns:
@@ -306,7 +302,7 @@ def history_bulk_data(parse_samples, start=None, verbose=False):
 
     return {
         "samples": parsed_samples,
-        "current": current,
+        "end_counter": current,
     }, {
         "pop_ping_drop_rate": pop_ping_drop_rate,
         "pop_ping_latency_ms": pop_ping_latency_ms,
@@ -401,7 +397,7 @@ def history_ping_stats(parse_samples, verbose=False):
 
     return {
         "samples": parse_samples,
-        "current": current,
+        "end_counter": current,
     }, {
         "total_ping_drop": tot,
         "count_full_ping_drop": count_full_drop,
