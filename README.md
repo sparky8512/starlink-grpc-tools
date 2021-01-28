@@ -100,6 +100,8 @@ There are `reboot` and `dish_stow` requests in the Device protocol, too, so it s
 
 Proper Python packaging, since some of the scripts are no longer self-contained.
 
+The requirement to run `grpcurl` and `protoc` could be eliminated by adding support for use of gRPC server reflection directly in the grpc scripts. This would sidestep any packaging questions about whether or not the protoc-generated files could be redistributed.
+
 ## Other Tidbits
 
 The Starlink Android app actually uses port 9201 instead of 9200. Both appear to expose the same gRPC service, but the one on port 9201 uses an HTTP/1.1 wrapper, whereas the one on port 9200 uses HTTP/2.0, which is what most gRPC tools expect.
