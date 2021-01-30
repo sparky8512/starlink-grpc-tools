@@ -38,7 +38,7 @@ python parseJsonHistory.py -h
 
 When used as-is, `parseJsonHistory.py` will summarize packet loss information from the data the dish records. There's other bits of data in there, though, so that script (or more likely the parsing logic it uses, which now resides in `starlink_json.py`) could be used as a starting point or example of how to iterate through it. Most of the data displayed in the Statistics page of the Starlink app appears to come from this same `get_history` gRPC response. See the file `get_history_notes.txt` for some ramblings on how to interpret it.
 
-The one bit of functionality this script has over the grpc scripts is that it supports capturing the grpcurl output to a file and reading from that, which may be useful if you're collecting data in one place but analyzing it in another. Otherwise, it's probably better to use `dishHistoryStats.py`, described below.
+The one bit of functionality this script has over the grpc scripts is that it supports capturing the grpcurl output to a file and reading from that, which may be useful if you're collecting data in one place but analyzing it in another. Otherwise, it's probably better to use `dish_grpc_text.py`, described below.
 
 ### The grpc scripts
 
@@ -57,32 +57,32 @@ python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=.
 ```
 Then move the resulting files to where the Python scripts can find them in the import path, such as in the same directory as the scripts themselves.
 
-Once those are available, the `dishHistoryStats.py` script can be used in place of the `grpcurl | parseJsonHistory.py` pipeline, with most of the same command line options. For example:
+Once those are available, the `dish_grpc_text.py` script can be used in place of the `grpcurl | parseJsonHistory.py` pipeline; however, the command line interface is slightly different because `dish_grpc_text.py` supports additional functionality. The equivalent command to `grpcurl | parseJsonHistory.py` would be:
 ```
-python3 parseHistoryStats.py
-```
-
-By default, `parseHistoryStats.py` (and `parseJsonHistory.py`) will output the stats in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
-
-To collect and record summary stats at the top of every hour, you could put something like the following in your user crontab (assuming you have moved the scripts to ~/bin and made them executable):
-```
-00 * * * * [ -e ~/dishStats.csv ] || ~/bin/dishHistoryStats.py -H >~/dishStats.csv; ~/bin/dishHistoryStats.py >>~/dishStats.csv
+python3 dish_grpc_text.py ping_drop
 ```
 
-`dishHistoryInflux.py` and `dishHistoryMqtt.py` are similar, but they send their output to an InfluxDB server and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
+By default, `dish_grpc_text.py` (and `parseJsonHistory.py`) will output in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
 
-`dishStatusCsv.py`, `dishStatusInflux.py`, and `dishStatusMqtt.py` output the status data instead of history data, to various data backends. The information they pull is mostly what appears related to the dish in the Debug Data section of the Starlink app. As with the corresponding history scripts, run them with `-h` command line option for usage details.
+To collect and record packet loss summary stats at the top of every hour, you could put something like the following in your user crontab (assuming you have moved the scripts to ~/bin and made them executable):
+```
+00 * * * * [ -e ~/dishStats.csv ] || ~/bin/dish_grpc_text.py -H >~/dishStats.csv; ~/bin/dish_grpc_text.py ping_drop >>~/dishStats.csv
+```
+
+`dish_grpc_influx.py` and `dish_grpc_mqtt.py` are similar, but they send their output to an InfluxDB server and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
+
+All 3 scripts support processing status data in addition to the history data. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes.
 
 By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```
-python3 dishStatusInflux.py -t 30 [... probably other args to specify server options ...] 
+python3 dish_grpc_influx.py -t 30 [... probably other args to specify server options ...] status
 ```
 
-Some of the scripts (currently only the InfluxDB ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
+Some of the scripts (currently only the InfluxDB one) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
 
 #### Bulk history data collection
 
-`dishStatusInflux.py` also supports a bulk mode that collects and writes the full second-by-second data to the server instead of summary stats. To select bulk mode, use the `-b` option. You'll probably also want to use the `-t` option to have it run in a loop.
+`dish_grpc_influx.py` and `dish_grpc_text.py` also support a bulk history mode that collects and writes the full second-by-second data instead of summary stats. To select bulk mode, use `bulk_history` for the mode argument. You'll probably also want to use the `-t` option to have it run in a loop.
 
 ### Other scripts
 
@@ -118,13 +118,13 @@ docker run -d -t --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostnam
     -e INFLUXDB_USER={Optional, InfluxDB Username} \
     -e INFLUXDB_PWD={Optional, InfluxDB Password} \
     -e INFLUXDB_DB={Pre-created DB name, starlinkstats works well} \
-    neurocis/starlink-grpc-tools dishStatusInflux.py -v
+    neurocis/starlink-grpc-tools dish_grpc_influx.py -v status alert_detail
 ```
 
 The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
 
-The `dishStatusInflux.py -v` is optional and omitting it will run same but not verbose, or you can replace it with one of the other scripts if you wish to run that instead, or use other command line options. There is also a `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
+The `dish_grpc_influx.py -v status alert_detail` is optional and omitting it will run same but not verbose, or you can replace it with one of the other scripts if you wish to run that instead, or use other command line options. There is also a `GrafanaDashboard - Starlink Statistics.json` which can be imported to get some charts like:
 
 ![image](https://user-images.githubusercontent.com/945191/104257179-ae570000-5431-11eb-986e-3fedd04bfcfb.png)
 
-You'll probably want to run with the `-t` option to `dishStatusInflux.py` to collect status information periodically for this to be meaningful.
+You'll probably want to run with the `-t` option to `dish_grpc_influx.py` to collect status information periodically for this to be meaningful.
