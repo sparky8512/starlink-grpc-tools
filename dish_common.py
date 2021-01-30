@@ -117,11 +117,15 @@ def conn_error(opts, msg, *args):
 
 
 class GlobalState:
-    """A mostly empty class for keeping state across loop iterations."""
+    """A class for keeping state across loop iterations."""
     def __init__(self):
         self.counter = None
         self.timestamp = None
         self.dish_id = None
+        self.context = starlink_grpc.ChannelContext()
+
+    def shutdown(self):
+        self.context.close()
 
 
 def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
@@ -159,7 +163,8 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
 
     if opts.satus_mode:
         try:
-            status_data, obstruct_detail, alert_detail = starlink_grpc.status_data()
+            status_data, obstruct_detail, alert_detail = starlink_grpc.status_data(
+                context=gstate.context)
         except starlink_grpc.GrpcError as e:
             if "status" in opts.mode:
                 if opts.need_id and gstate.dish_id is None:
@@ -182,7 +187,7 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             add_data(alert_detail, "status")
     elif opts.need_id and gstate.dish_id is None:
         try:
-            gstate.dish_id = starlink_grpc.get_id()
+            gstate.dish_id = starlink_grpc.get_id(context=gstate.context)
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting dish ID: %s", str(e))
             return 1
@@ -191,7 +196,9 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
 
     if opts.ping_mode:
         try:
-            general, ping, runlen = starlink_grpc.history_ping_stats(opts.samples, opts.verbose)
+            general, ping, runlen = starlink_grpc.history_ping_stats(opts.samples,
+                                                                     opts.verbose,
+                                                                     context=gstate.context)
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting ping stats: %s", str(e))
             return 1
@@ -209,7 +216,8 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
         try:
             general, bulk = starlink_grpc.history_bulk_data(parse_samples,
                                                             start=start,
-                                                            verbose=opts.verbose)
+                                                            verbose=opts.verbose,
+                                                            context=gstate.context)
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting history: %s", str(e))
             return 1

@@ -313,6 +313,7 @@ def main():
         if gstate.points:
             rc = flush_points(opts, gstate)
         gstate.influx_client.close()
+        gstate.shutdown()
 
     sys.exit(rc)
 

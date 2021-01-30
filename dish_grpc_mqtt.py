@@ -113,15 +113,18 @@ def main():
 
     gstate = dish_common.GlobalState()
 
-    next_loop = time.monotonic()
-    while True:
-        rc = loop_body(opts, gstate)
-        if opts.loop_interval > 0.0:
-            now = time.monotonic()
-            next_loop = max(next_loop + opts.loop_interval, now)
-            time.sleep(next_loop - now)
-        else:
-            break
+    try:
+        next_loop = time.monotonic()
+        while True:
+            rc = loop_body(opts, gstate)
+            if opts.loop_interval > 0.0:
+                now = time.monotonic()
+                next_loop = max(next_loop + opts.loop_interval, now)
+                time.sleep(next_loop - now)
+            else:
+                break
+    finally:
+        gstate.shutdown()
 
     sys.exit(rc)
 
