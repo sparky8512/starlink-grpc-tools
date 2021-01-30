@@ -71,7 +71,7 @@ To collect and record packet loss summary stats at the top of every hour, you co
 
 `dish_grpc_influx.py` and `dish_grpc_mqtt.py` are similar, but they send their output to an InfluxDB server and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
 
-All 3 scripts support processing status data in addition to the history data. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes.
+All 3 scripts support processing status data in addition to the history data. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
 
 By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```
