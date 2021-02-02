@@ -1,10 +1,6 @@
 #!/usr/bin/python3
-######################################################################
-#
-# Simple example of how to poll the get_status request directly using
-# grpc calls.
-#
-######################################################################
+"""Simple example of get_status request use grpc call directly."""
+
 import grpc
 
 import spacex.api.device.device_pb2
@@ -19,8 +15,9 @@ with grpc.insecure_channel("192.168.100.1:9200") as channel:
 # Dump everything
 print(response)
 
-## Just the software version
-#print(response.dish_get_status.device_info.software_version)
+# Just the software version
+print("Software version:", response.dish_get_status.device_info.software_version)
 
-## Check if connected
-#print("Connected" if response.dish_get_status.state == spacex.api.device.dish_pb2.DishState.CONNECTED else "Not connected")
+# Check if connected
+print("Connected" if response.dish_get_status.state ==
+      spacex.api.device.dish_pb2.DishState.CONNECTED else "Not connected")
