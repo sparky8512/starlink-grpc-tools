@@ -23,7 +23,9 @@ BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
 SAMPLES_DEFAULT = 3600
 LOOP_TIME_DEFAULT = 0
 STATUS_MODES = ["status", "obstruction_detail", "alert_detail"]
-PING_MODES = ["ping_drop", "ping_run_length"]
+HISTORY_STATS_MODES = [
+    "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage"
+]
 UNGROUPED_MODES = []
 
 
@@ -37,7 +39,7 @@ def create_arg_parser(output_description, bulk_history=True):
         fromfile_prefix_chars="@",
         add_help=False)
 
-    all_modes = STATUS_MODES + PING_MODES + UNGROUPED_MODES
+    all_modes = STATUS_MODES + HISTORY_STATS_MODES + UNGROUPED_MODES
     if bulk_history:
         all_modes.append("bulk_history")
     parser.add_argument("mode",
@@ -93,7 +95,7 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
 
     # for convenience, set flags for whether any mode in a group is selected
     opts.satus_mode = bool(set(STATUS_MODES).intersection(opts.mode))
-    opts.ping_mode = bool(set(PING_MODES).intersection(opts.mode))
+    opts.history_stats_mode = bool(set(HISTORY_STATS_MODES).intersection(opts.mode))
     opts.bulk_mode = "bulk_history" in opts.mode
 
     if opts.samples is None:
@@ -163,8 +165,8 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
 
     if opts.satus_mode:
         try:
-            status_data, obstruct_detail, alert_detail = starlink_grpc.status_data(
-                context=gstate.context)
+            groups = starlink_grpc.status_data(context=gstate.context)
+            status_data, obstruct_detail, alert_detail = groups[0:3]
         except starlink_grpc.GrpcError as e:
             if "status" in opts.mode:
                 if opts.need_id and gstate.dish_id is None:
@@ -194,11 +196,10 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
         if opts.verbose:
             print("Using dish ID: " + gstate.dish_id)
 
-    if opts.ping_mode:
+    if opts.history_stats_mode:
         try:
-            general, ping, runlen = starlink_grpc.history_ping_stats(opts.samples,
-                                                                     opts.verbose,
-                                                                     context=gstate.context)
+            groups = starlink_grpc.history_stats(opts.samples, opts.verbose, context=gstate.context)
+            general, ping, runlen, latency, loaded, usage = groups[0:6]
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting ping stats: %s", str(e))
             return 1
@@ -207,6 +208,12 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             add_data(ping, "ping_stats")
         if "ping_run_length" in opts.mode:
             add_data(runlen, "ping_stats")
+        if "ping_latency" in opts.mode:
+            add_data(latency, "ping_stats")
+        if "ping_loaded_latency" in opts.mode:
+            add_data(loaded, "ping_stats")
+        if "usage" in opts.mode:
+            add_data(usage, "usage")
 
     if opts.bulk_mode and add_bulk:
         before = time.time()

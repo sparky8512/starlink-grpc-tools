@@ -66,8 +66,8 @@ This group holds information about the current state of the user terminal.
 
 Obstruction detail status data
 ------------------------------
-This group holds a single field, with more detail on the specific areas the
-user terminal has determined to be obstructed.
+This group holds additional detail regarding the specific areas the user
+terminal has determined to be obstructed.
 
 : **wedges_fraction_obstructed** : A 12 element sequence. Each element
     represents a 30 degree wedge of area and its value indicates the fraction
@@ -78,6 +78,9 @@ user terminal has determined to be obstructed.
     the sequence represents the wedge that spans exactly North to 30 degrees
     East of North, and subsequent wedges rotate 30 degrees further in the same
     direction. (It's not clear if this will hold true at all latitudes.)
+: **valid_s** : It is unclear what this field means exactly, but it appears to
+    be a measure of how complete the data is that the user terminal uses to
+    determine obstruction locations.
 
 See also *fraction_obstructed* in general status data, which should equal the
 sum of all *wedges_fraction_obstructed* elements.
@@ -110,9 +113,9 @@ The sample interval is currently 1 second.
 : **samples** : The number of samples analyzed (for statistics) or returned
     (for bulk data).
 : **end_counter** : The total number of data samples that have been written to
-    the history buffer since dish reboot, irrespective of buffer wrap.  This
-    can be used to keep track of how many samples are new in comparison to a
-    prior query of the history data.
+    the history buffer since reboot of the user terminal, irrespective of
+    buffer wrap.  This can be used to keep track of how many samples are new
+    in comparison to a prior query of the history data.
 
 Bulk history data
 -----------------
@@ -133,9 +136,10 @@ representing the value over time, ending at the current time.
 : **scheduled** : Boolean indicating whether or not a satellite was scheduled
     to be available for transmit/receive during the sample period.  When
     false, ping drop shows as "No satellites" in Starlink app.
-: **obstructed** : Boolean indicating whether or not the dish determined the
-    signal between it and the satellite was obstructed during the sample
-    period. When true, ping drop shows as "Obstructed" in the Starlink app.
+: **obstructed** : Boolean indicating whether or not the user terminal
+    determined the signal between it and the satellite was obstructed during
+    the sample period. When true, ping drop shows as "Obstructed" in the
+    Starlink app.
 
 There is no specific data field in the raw history data that directly
 correlates with "Other" or "Beta downtime" in the Starlink app (or whatever it
@@ -208,9 +212,88 @@ of stats, even if they happen at the beginning or end of a run of 100% ping
 drop samples. To compute the amount of time that experienced ping loss in less
 than a single run of 100% ping drop, use (*total_ping_drop* -
 *count_full_ping_drop*) from the ping drop stats.
+
+Ping latency history statistics
+-------------------------------
+This group of statistics characterizes latency of ping request/response in
+various ways. For all non-sequence fields and most sequence elements, the
+value may report as None to indicate no matching samples. The exception is
+*load_bucket_samples* elements, which report 0 for no matching samples.
+
+The fields that have "all" in their name are computed across all samples that
+had any ping success (ping drop < 1). The fields that have "full" in their
+name are computed across only the samples that have 100% ping success (ping
+drop = 0). Which one is more interesting may depend on intended use. High rate
+of packet loss appears to cause outlier latency values on the high side. On
+the one hand, those are real cases, so should not be dismissed lightly. On the
+other hand, the "full" numbers are more directly comparable to sample sets
+taken over time.
+
+: **mean_all_ping_latency** : Weighted mean latency value, in milliseconds, of
+    all samples that experienced less than 100% ping drop. Values are weighted
+    by amount of ping success (1 - ping drop).
+: **deciles_all_ping_latency** : An 11 element sequence recording the weighted
+    deciles (10-quantiles) of latency values, in milliseconds, for all samples
+    that experienced less that 100% ping drop, including the minimum and
+    maximum values as the 0th and 10th deciles respectively. The 5th decile
+    (at sequence index 5) is the weighted median latency value.
+: **mean_full_ping_latency** : Mean latency value, in milliseconds, of samples
+    that experienced no ping drop.
+: **deciles_full_ping_latency** : An 11 element sequence recording the deciles
+    (10-quantiles) of latency values, in milliseconds, for all samples that
+    experienced no ping drop, including the minimum and maximum values as the
+    0th and 10th deciles respectively. The 5th decile (at sequence index 5) is
+    the median latency value.
+: **stdev_full_ping_latency** : Population standard deviation of the latency
+    value of samples that experienced no ping drop.
+
+Loaded ping latency statistics
+------------------------------
+This group of statistics attempts to characterize latency of ping
+request/response under various network load conditions. Samples are grouped by
+total (down+up) bandwidth used during the sample period, using a log base 2
+scale. These groups are referred to as "load buckets" below. The first bucket
+in each sequence represents samples that use less than 1Mbps (millions of bits
+per second). Subsequent buckets use more bandwidth than that covered by prior
+buckets, but less than twice the maximum bandwidth of the immediately prior
+bucket. The last bucket, at sequence index 14, represents all samples not
+covered by a prior bucket, which works out to any sample using 8192Mbps or
+greater. Only samples that experience no ping drop are included in any of the
+buckets.
+
+This group of fields should be considered EXPERIMENTAL and thus subject to
+change without regard to backward compatibility.
+
+Note that in all cases, the latency values are of "ping" traffic, which may be
+prioritized lower than other traffic by various network layers. How much
+bandwidth constitutes a fully loaded network connection may vary over time.
+Buckets with few samples may not contain statistically significant latency
+data.
+
+: **load_bucket_samples** : A 15 element sequence recording the number of
+    samples per load bucket. See above for load bucket partitioning.
+    EXPERIMENTAL.
+: **load_bucket_min_latency** : A 15 element sequence recording the minimum
+    latency value, in milliseconds, per load bucket. EXPERIMENTAL.
+: **load_bucket_median_latency** : A 15 element sequence recording the median
+    latency value, in milliseconds, per load bucket. EXPERIMENTAL.
+: **load_bucket_max_latency** : A 15 element sequence recording the maximum
+    latency value, in milliseconds, per load bucket. EXPERIMENTAL.
+
+Bandwidth usage history statistics
+----------------------------------
+This group of statistics characterizes total bandwidth usage over the sample
+period.
+
+: **download_usage** : Total number of bytes downloaded to the user terminal
+    during the sample period.
+: **upload_usage** : Total number of bytes uploaded from the user terminal
+    during the sample period.
 """
 
 from itertools import chain
+import math
+import statistics
 
 import grpc
 
@@ -233,7 +316,11 @@ class GrpcError(Exception):
 
 
 class ChannelContext:
-    """A wrapper for reusing an open grpc Channel across calls."""
+    """A wrapper for reusing an open grpc Channel across calls.
+
+    `close()` should be called on the object when it is no longer
+    in use.
+    """
     def __init__(self, target="192.168.100.1:9200"):
         self.channel = None
         self.target = target
@@ -258,9 +345,9 @@ def status_field_names():
         See module level docs regarding brackets in field names.
 
     Returns:
-        A tuple with 3 lists, the first with status data field names, the
-        second with obstruction detail field names, and the third with alert
-        detail field names.
+        A tuple with 3 lists, with status data field names, alert detail field
+        names, and obstruction detail field names to their respective values,
+        in that order.
     """
     alert_names = []
     for field in spacex.api.device.dish_pb2.DishAlerts.DESCRIPTOR.fields:
@@ -284,6 +371,7 @@ def status_field_names():
         "seconds_obstructed",
     ], [
         "wedges_fraction_obstructed[12]",
+        "valid_s",
     ], alert_names
 
 
@@ -346,9 +434,9 @@ def status_data(context=None):
             across repeated calls.
 
     Returns:
-        A tuple with 3 dicts, the first mapping status data names to their
-        values, the second mapping alert detail field names to their values,
-        and the third mapping obstruction detail field names to their values.
+        A tuple with 3 dicts, mapping status data field names, alert detail
+        field names, and obstruction detail field names to their respective
+        values, in that order.
 
     Raises:
         GrpcError: Failed getting history info from the Starlink user
@@ -387,6 +475,7 @@ def status_data(context=None):
         "seconds_obstructed": status.obstruction_stats.last_24h_obstructed_s,
     }, {
         "wedges_fraction_obstructed[]": status.obstruction_stats.wedge_abs_fraction_obstructed,
+        "valid_s": status.obstruction_stats.valid_s,
     }, alerts
 
 
@@ -415,15 +504,25 @@ def history_bulk_field_names():
 
 
 def history_ping_field_names():
+    """Deprecated. Use history_stats_field_names instead."""
+    return history_stats_field_names()[0:3]
+
+
+def history_stats_field_names():
     """Return the field names of the packet loss stats.
 
     Note:
         See module level docs regarding brackets in field names.
 
     Returns:
-        A tuple with 3 lists, the first with general data names, the second
-        with ping drop stat names, and the third with ping drop run length
-        stat names.
+        A tuple with 6 lists, with general data names, ping drop stat names,
+        ping drop run length stat names, ping latency stat names, loaded ping
+        latency stat names, and bandwidth usage stat names, in that order.
+
+        Note:
+            Additional lists may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 6 elements.
     """
     return [
         "samples",
@@ -442,6 +541,20 @@ def history_ping_field_names():
         "final_run_fragment",
         "run_seconds[1,61]",
         "run_minutes[1,61]",
+    ], [
+        "mean_all_ping_latency",
+        "deciles_all_ping_latency[11]",
+        "mean_full_ping_latency",
+        "deciles_full_ping_latency[11]",
+        "stdev_full_ping_latency",
+    ], [
+        "load_bucket_samples[15]",
+        "load_bucket_min_latency[15]",
+        "load_bucket_median_latency[15]",
+        "load_bucket_max_latency[15]",
+    ], [
+        "download_usage",
+        "upload_usage",
     ]
 
 
@@ -592,6 +705,11 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None):
 
 
 def history_ping_stats(parse_samples, verbose=False, context=None):
+    """Deprecated. Use history_stats instead."""
+    return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
+
+
+def history_stats(parse_samples, verbose=False, context=None):
     """Fetch, parse, and compute the packet loss stats.
 
     Note:
@@ -605,9 +723,15 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
             across repeated calls.
 
     Returns:
-        A tuple with 3 dicts, the first mapping general data names to their
-        values, the second mapping ping drop stat names to their values and
-        the third mapping ping drop run length stat names to their values.
+        A tuple with 6 dicts, mapping general data names, ping drop stat
+        names, ping drop run length stat names, ping latency stat names,
+        loaded ping latency stat names, and bandwidth usage stat names to
+        their respective values, in that order.
+
+        Note:
+            Additional dicts may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 6 elements.
 
     Raises:
         GrpcError: Failed getting history info from the Starlink user
@@ -635,6 +759,13 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
     minute_runs = [0] * 60
     run_length = 0
     init_run_length = None
+
+    usage_down = 0.0
+    usage_up = 0.0
+
+    rtt_full = []
+    rtt_all = []
+    rtt_buckets = [[] for _ in range(15)]
 
     for i in sample_range:
         d = history.pop_ping_drop_rate[i]
@@ -669,6 +800,22 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
                 count_full_obstruct += 1
         tot += d
 
+        down = history.downlink_throughput_bps[i]
+        usage_down += down
+        up = history.uplink_throughput_bps[i]
+        usage_up += up
+
+        rtt = history.pop_ping_latency_ms[i]
+        # note that "full" here means the opposite of ping drop full
+        if d == 0.0:
+            rtt_full.append(rtt)
+            if down + up > 500000:
+                rtt_buckets[min(14, int(math.log2((down+up) / 500000)))].append(rtt)
+            else:
+                rtt_buckets[0].append(rtt)
+        if d < 1.0:
+            rtt_all.append((rtt, 1.0 - d))
+
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
     # to next sample range), but to avoid double-reporting, just call it
@@ -676,6 +823,53 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
     if init_run_length is None:
         init_run_length = run_length
         run_length = 0
+
+    def weighted_mean_and_quantiles(data, n):
+        if not data:
+            return None, [None] * (n+1)
+        total_weight = sum(x[1] for x in data)
+        result = []
+        items = iter(data)
+        value, accum_weight = next(items)
+        accum_value = value * accum_weight
+        for boundary in (total_weight * x / n for x in range(n)):
+            while accum_weight < boundary:
+                try:
+                    value, weight = next(items)
+                    accum_value += value * weight
+                    accum_weight += weight
+                except StopIteration:
+                    # shouldn't happen, but in case of float precision weirdness...
+                    break
+            result.append(value)
+        result.append(data[-1][0])
+        accum_value += sum(x[0] for x in items)
+        return accum_value / total_weight, result
+
+    bucket_samples = []
+    bucket_min = []
+    bucket_median = []
+    bucket_max = []
+    for bucket in rtt_buckets:
+        if bucket:
+            bucket_samples.append(len(bucket))
+            bucket_min.append(min(bucket))
+            bucket_median.append(statistics.median(bucket))
+            bucket_max.append(max(bucket))
+        else:
+            bucket_samples.append(0)
+            bucket_min.append(None)
+            bucket_median.append(None)
+            bucket_max.append(None)
+
+    rtt_all.sort(key=lambda x: x[0])
+    wmean_all, wdeciles_all = weighted_mean_and_quantiles(rtt_all, 10)
+    if rtt_full:
+        deciles_full = [min(rtt_full)]
+        deciles_full.extend(statistics.quantiles(rtt_full, n=10, method="inclusive"))
+        deciles_full.append(max(rtt_full))
+    else:
+        deciles_full = [None] * 11
 
     return {
         "samples": parse_samples,
@@ -694,4 +888,18 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
         "final_run_fragment": run_length,
         "run_seconds[1,]": second_runs,
         "run_minutes[1,]": minute_runs,
+    }, {
+        "mean_all_ping_latency": wmean_all,
+        "deciles_all_ping_latency[]": wdeciles_all,
+        "mean_full_ping_latency": statistics.fmean(rtt_full) if rtt_full else None,
+        "deciles_full_ping_latency[]": deciles_full,
+        "stdev_full_ping_latency": statistics.pstdev(rtt_full) if rtt_full else None,
+    }, {
+        "load_bucket_samples[]": bucket_samples,
+        "load_bucket_min_latency[]": bucket_min,
+        "load_bucket_median_latency[]": bucket_median,
+        "load_bucket_max_latency[]": bucket_max,
+    }, {
+        "download_usage": int(round(usage_down / 8)),
+        "upload_usage": int(round(usage_up / 8)),
     }

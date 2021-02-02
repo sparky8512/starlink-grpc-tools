@@ -36,6 +36,19 @@ VERBOSE_FIELD_MAP = {
     "final_run_fragment": "Final drop run fragment",
     "run_seconds": "Per-second drop runs",
     "run_minutes": "Per-minute drop runs",
+
+    # ping_latency fields
+    "mean_all_ping_latency": "Mean RTT, drop < 1",
+    "deciles_all_ping_latency": "RTT deciles, drop < 1",
+    "mean_full_ping_latency": "Mean RTT, drop == 0",
+    "deciles_full_ping_latency": "RTT deciles, drop == 0",
+    "stdev_full_ping_latency": "RTT standard deviation, drop == 0",
+
+    # ping_loaded_latency is still experimental, so leave those unexplained
+
+    # usage fields
+    "download_usage": "Bytes downloaded",
+    "upload_usage": "Bytes uploaded",
 }
 
 
@@ -85,13 +98,20 @@ def print_header(opts):
         header_add(general)
         header_add(bulk)
 
-    if opts.ping_mode:
-        general, ping, runlen = starlink_grpc.history_ping_field_names()
+    if opts.history_stats_mode:
+        groups = starlink_grpc.history_stats_field_names()
+        general, ping, runlen, latency, loaded, usage = groups[0:6]
         header_add(general)
         if "ping_drop" in opts.mode:
             header_add(ping)
         if "ping_run_length" in opts.mode:
             header_add(runlen)
+        if "ping_loaded_latency" in opts.mode:
+            header_add(loaded)
+        if "ping_latency" in opts.mode:
+            header_add(latency)
+        if "usage" in opts.mode:
+            header_add(usage)
 
     print(",".join(header))
 
