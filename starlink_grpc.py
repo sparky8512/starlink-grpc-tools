@@ -39,7 +39,10 @@ This group holds information about the current state of the user terminal.
 : **snr** : Most recent sample value. See bulk history data for detail.
 : **seconds_to_first_nonempty_slot** : Amount of time from now, in seconds,
     until a satellite will be scheduled to be available for transmit/receive.
-    See also *scheduled* in the bulk history data.
+    See also *scheduled* in the bulk history data. May report as a negative
+    number, which appears to indicate unknown time until next satellite
+    scheduled and usually correlates with *state* reporting as other than
+    "CONNECTED".
 : **pop_ping_drop_rate** : Most recent sample value. See bulk history data for
     detail.
 : **downlink_throughput_bps** : Most recent sample value. See bulk history
