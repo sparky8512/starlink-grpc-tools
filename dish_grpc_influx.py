@@ -214,7 +214,7 @@ def sync_timebase(opts, gstate):
 
 
 def loop_body(opts, gstate):
-    fields = {"status": {}, "ping_stats": {}}
+    fields = {"status": {}, "ping_stats": {}, "usage": {}}
 
     def cb_add_item(key, val, category):
         fields[category][key] = val
