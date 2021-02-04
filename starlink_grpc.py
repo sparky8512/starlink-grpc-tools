@@ -349,8 +349,7 @@ def status_field_names():
 
     Returns:
         A tuple with 3 lists, with status data field names, alert detail field
-        names, and obstruction detail field names to their respective values,
-        in that order.
+        names, and obstruction detail field names, in that order.
     """
     alert_names = []
     for field in spacex.api.device.dish_pb2.DishAlerts.DESCRIPTOR.fields:
@@ -376,6 +375,38 @@ def status_field_names():
         "wedges_fraction_obstructed[12]",
         "valid_s",
     ], alert_names
+
+
+def status_field_types():
+    """Return the field types of the status data.
+
+    Return the type classes for each field. For sequence types, the type of
+    element in the sequence is returned, not the type of the sequence.
+
+    Returns:
+        A tuple with 3 lists, with status data field types, alert detail field
+        types, and obstruction detail field types, in that order.
+    """
+    return [
+        str,  # id
+        str,  # hardware_version
+        str,  # software_version
+        str,  # state
+        int,  # uptime
+        float,  # snr
+        float,  # seconds_to_first_nonempty_slot
+        float,  # pop_ping_drop_rate
+        float,  # downlink_throughput_bps
+        float,  # uplink_throughput_bps
+        float,  # pop_ping_latency_ms
+        int,  # alerts
+        float,  # fraction_obstructed
+        bool,  # currently_obstructed
+        float,  # seconds_obstructed
+    ], [
+        float,  # wedges_fraction_obstructed[]
+        float,  # valid_s
+    ], [bool] * len(spacex.api.device.dish_pb2.DishAlerts.DESCRIPTOR.fields)
 
 
 def get_status(context=None):
@@ -506,6 +537,30 @@ def history_bulk_field_names():
     ]
 
 
+def history_bulk_field_types():
+    """Return the field types of the bulk history data.
+
+    Return the type classes for each field. For sequence types, the type of
+    element in the sequence is returned, not the type of the sequence.
+
+    Returns:
+        A tuple with 2 lists, the first with general data types, the second
+        with bulk history data types.
+    """
+    return [
+        int,  # samples
+        int,  # end_counter
+    ], [
+        float,  # pop_ping_drop_rate[]
+        float,  # pop_ping_latency_ms[]
+        float,  # downlink_throughput_bps[]
+        float,  # uplink_throughput_bps[]
+        float,  # snr[]
+        bool,  # scheduled[]
+        bool,  # obstructed[]
+    ]
+
+
 def history_ping_field_names():
     """Deprecated. Use history_stats_field_names instead."""
     return history_stats_field_names()[0:3]
@@ -558,6 +613,56 @@ def history_stats_field_names():
     ], [
         "download_usage",
         "upload_usage",
+    ]
+
+
+def history_stats_field_types():
+    """Return the field types of the packet loss stats.
+
+    Return the type classes for each field. For sequence types, the type of
+    element in the sequence is returned, not the type of the sequence.
+
+    Returns:
+        A tuple with 6 lists, with general data types, ping drop stat types,
+        ping drop run length stat types, ping latency stat types, loaded ping
+        latency stat types, and bandwidth usage stat types, in that order.
+
+        Note:
+            Additional lists may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 6 elements.
+    """
+    return [
+        int,  # samples
+        int,  # end_counter
+    ], [
+        float,  # total_ping_drop
+        int,  # count_full_ping_drop
+        int,  # count_obstructed
+        float,  # total_obstructed_ping_drop
+        int,  # count_full_obstructed_ping_drop
+        int,  # count_unscheduled
+        float,  # total_unscheduled_ping_drop
+        int,  # count_full_unscheduled_ping_drop
+    ], [
+        int,  # init_run_fragment
+        int,  # final_run_fragment
+        int,  # run_seconds[]
+        int,  # run_minutes[]
+    ], [
+        float,  # mean_all_ping_latency
+        float,  # deciles_all_ping_latency[]
+        float,  # mean_full_ping_latency
+        float,  # deciles_full_ping_latency[]
+        float,  # stdev_full_ping_latency
+    ], [
+        int,  # load_bucket_samples[]
+        float,  # load_bucket_min_latency[]
+        float,  # load_bucket_median_latency[]
+        float,  # load_bucket_max_latency[]
+    ], [
+        int,  # download_usage
+        int,  # upload_usage
     ]
 
 

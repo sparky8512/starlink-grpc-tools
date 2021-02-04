@@ -34,19 +34,13 @@ def create_arg_parser(output_description, bulk_history=True):
     parser = argparse.ArgumentParser(
         description="Collect status and/or history data from a Starlink user terminal and " +
         output_description,
-        epilog="Additional arguments can be read from a file by including the @FILENAME as an "
+        epilog="Additional arguments can be read from a file by including @FILENAME as an "
         "option, where FILENAME is a path to a file that contains arguments, one per line.",
         fromfile_prefix_chars="@",
         add_help=False)
 
-    all_modes = STATUS_MODES + HISTORY_STATS_MODES + UNGROUPED_MODES
-    if bulk_history:
-        all_modes.append("bulk_history")
-    parser.add_argument("mode",
-                        nargs="+",
-                        choices=all_modes,
-                        help="The data group to record, one or more of: " + ", ".join(all_modes),
-                        metavar="mode")
+    # need to remember this for later
+    parser.bulk_history = bulk_history
 
     group = parser.add_argument_group(title="General options")
     group.add_argument("-h", "--help", action="help", help="Be helpful")
@@ -91,6 +85,15 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
     Returns:
         An argparse Namespace object with the parsed options set as attributes.
     """
+    all_modes = STATUS_MODES + HISTORY_STATS_MODES + UNGROUPED_MODES
+    if parser.bulk_history:
+        all_modes.append("bulk_history")
+    parser.add_argument("mode",
+                        nargs="+",
+                        choices=all_modes,
+                        help="The data group to record, one or more of: " + ", ".join(all_modes),
+                        metavar="mode")
+
     opts = parser.parse_args()
 
     # for convenience, set flags for whether any mode in a group is selected
@@ -216,43 +219,52 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             add_data(usage, "usage")
 
     if opts.bulk_mode and add_bulk:
-        before = time.time()
-
-        start = gstate.counter
-        parse_samples = opts.samples if start is None else -1
-        try:
-            general, bulk = starlink_grpc.history_bulk_data(parse_samples,
-                                                            start=start,
-                                                            verbose=opts.verbose,
-                                                            context=gstate.context)
-        except starlink_grpc.GrpcError as e:
-            conn_error(opts, "Failure getting history: %s", str(e))
-            return 1
-
-        after = time.time()
-        parsed_samples = general["samples"]
-        new_counter = general["end_counter"]
-        timestamp = gstate.timestamp
-        # check this first, so it doesn't report as lost time sync
-        if gstate.counter is not None and new_counter != gstate.counter + parsed_samples:
-            timestamp = None
-        # Allow up to 2 seconds of time drift before forcibly re-syncing, since
-        # +/- 1 second can happen just due to scheduler timing.
-        if timestamp is not None and not before - 2.0 <= timestamp + parsed_samples <= after + 2.0:
-            if opts.verbose:
-                print("Lost sample time sync at: " +
-                      str(datetime.fromtimestamp(timestamp + parsed_samples, tz=timezone.utc)))
-            timestamp = None
-        if timestamp is None:
-            timestamp = int(before)
-            if opts.verbose:
-                print("Establishing new time base: {0} -> {1}".format(
-                    new_counter, datetime.fromtimestamp(timestamp, tz=timezone.utc)))
-            timestamp -= parsed_samples
-
-        add_bulk(bulk, parsed_samples, timestamp, new_counter - parsed_samples)
-
-        gstate.counter = new_counter
-        gstate.timestamp = timestamp + parsed_samples
+        return get_bulk_data(opts, gstate, add_bulk)
 
     return 0
+
+
+def get_bulk_data(opts, gstate, add_bulk):
+    """Fetch bulk data.  See `get_data` for details.
+
+    This was split out in case bulk data needs to be handled separately, for
+    example, if dish_id needs to be known before calling.
+    """
+    before = time.time()
+
+    start = gstate.counter
+    parse_samples = opts.samples if start is None else -1
+    try:
+        general, bulk = starlink_grpc.history_bulk_data(parse_samples,
+                                                        start=start,
+                                                        verbose=opts.verbose,
+                                                        context=gstate.context)
+    except starlink_grpc.GrpcError as e:
+        conn_error(opts, "Failure getting history: %s", str(e))
+        return 1
+
+    after = time.time()
+    parsed_samples = general["samples"]
+    new_counter = general["end_counter"]
+    timestamp = gstate.timestamp
+    # check this first, so it doesn't report as lost time sync
+    if gstate.counter is not None and new_counter != gstate.counter + parsed_samples:
+        timestamp = None
+    # Allow up to 2 seconds of time drift before forcibly re-syncing, since
+    # +/- 1 second can happen just due to scheduler timing.
+    if timestamp is not None and not before - 2.0 <= timestamp + parsed_samples <= after + 2.0:
+        if opts.verbose:
+            print("Lost sample time sync at: " +
+                  str(datetime.fromtimestamp(timestamp + parsed_samples, tz=timezone.utc)))
+        timestamp = None
+    if timestamp is None:
+        timestamp = int(before)
+        if opts.verbose:
+            print("Establishing new time base: {0} -> {1}".format(
+                new_counter, datetime.fromtimestamp(timestamp, tz=timezone.utc)))
+        timestamp -= parsed_samples
+
+    add_bulk(bulk, parsed_samples, timestamp, new_counter - parsed_samples)
+
+    gstate.counter = new_counter
+    gstate.timestamp = timestamp + parsed_samples

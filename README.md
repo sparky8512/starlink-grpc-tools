@@ -69,9 +69,9 @@ To collect and record packet loss summary stats at the top of every hour, you co
 00 * * * * [ -e ~/dishStats.csv ] || ~/bin/dish_grpc_text.py -H >~/dishStats.csv; ~/bin/dish_grpc_text.py ping_drop >>~/dishStats.csv
 ```
 
-`dish_grpc_influx.py` and `dish_grpc_mqtt.py` are similar, but they send their output to an InfluxDB server and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
+`dish_grpc_influx.py`, `dish_grpc_sqlite.py`, and `dish_grpc_mqtt.py` are similar, but they send their output to an InfluxDB server, a sqlite database, and a MQTT broker, respectively. Run them with `-h` command line option for details on how to specify server and/or database options.
 
-All 3 scripts support processing status data in addition to the history data. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
+All 4 scripts support processing status data in addition to the history data. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
 
 By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```
@@ -82,7 +82,7 @@ Some of the scripts (currently only the InfluxDB one) also support specifying op
 
 #### Bulk history data collection
 
-`dish_grpc_influx.py` and `dish_grpc_text.py` also support a bulk history mode that collects and writes the full second-by-second data instead of summary stats. To select bulk mode, use `bulk_history` for the mode argument. You'll probably also want to use the `-t` option to have it run in a loop.
+`dish_grpc_influx.py`, `dish_grpc_sqlite.py`, and `dish_grpc_text.py` also support a bulk history mode that collects and writes the full second-by-second data instead of summary stats. To select bulk mode, use `bulk_history` for the mode argument. You'll probably also want to use the `-t` option to have it run in a loop.
 
 ### Other scripts
 
@@ -100,7 +100,7 @@ Possibly more simple examples to come, as the other scripts have started getting
 
 ## To Be Done (Maybe)
 
-More data backend options, including local database support.
+Maybe more data backend options. If there's one you'd like to see supported, please open a feature request issue.
 
 There are `reboot` and `dish_stow` requests in the Device protocol, too, so it should be trivial to write a command that initiates dish reboot and stow operations. These are easy enough to do with `grpcurl`, though, as there is no need to parse through the response data. For that matter, they're easy enough to do with the Starlink app.
 
