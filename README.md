@@ -110,7 +110,7 @@ The requirement to run `grpcurl` and `protoc` could be eliminated by adding supp
 
 ## Other Tidbits
 
-The Starlink Android app actually uses port 9201 instead of 9200. Both appear to expose the same gRPC service, but the one on port 9201 uses an HTTP/1.1 wrapper, whereas the one on port 9200 uses HTTP/2.0, which is what most gRPC tools expect.
+The Starlink Android app actually uses port 9201 instead of 9200. Both appear to expose the same gRPC service, but the one on port 9201 uses [gRPC-Web](https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md), which can use HTTP/1.1, whereas the one on port 9200 uses HTTP/2, which is what most gRPC tools expect.
 
 The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 9001 (HTTP/1.1).
 
