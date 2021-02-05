@@ -300,8 +300,9 @@ import statistics
 
 import grpc
 
-import spacex.api.device.device_pb2
-import spacex.api.device.device_pb2_grpc
+from spacex.api.device import device_pb2
+from spacex.api.device import device_pb2_grpc
+from spacex.api.device import dish_pb2
 
 
 class GrpcError(Exception):
@@ -352,7 +353,7 @@ def status_field_names():
         names, and obstruction detail field names, in that order.
     """
     alert_names = []
-    for field in spacex.api.device.dish_pb2.DishAlerts.DESCRIPTOR.fields:
+    for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
 
     return [
@@ -406,7 +407,7 @@ def status_field_types():
     ], [
         float,  # wedges_fraction_obstructed[]
         float,  # valid_s
-    ], [bool] * len(spacex.api.device.dish_pb2.DishAlerts.DESCRIPTOR.fields)
+    ], [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
 
 
 def get_status(context=None):
@@ -423,15 +424,15 @@ def get_status(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
+            stub = device_pb2_grpc.DeviceStub(channel)
+            response = stub.Handle(device_pb2.Request(get_status={}))
         return response.dish_get_status
 
     while True:
         channel, reused = context.get_channel()
         try:
-            stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(spacex.api.device.device_pb2.Request(get_status={}))
+            stub = device_pb2_grpc.DeviceStub(channel)
+            response = stub.Handle(device_pb2.Request(get_status={}))
             return response.dish_get_status
         except grpc.RpcError:
             context.close()
@@ -495,7 +496,7 @@ def status_data(context=None):
         "id": status.device_info.id,
         "hardware_version": status.device_info.hardware_version,
         "software_version": status.device_info.software_version,
-        "state": spacex.api.device.dish_pb2.DishState.Name(status.state),
+        "state": dish_pb2.DishState.Name(status.state),
         "uptime": status.device_state.uptime_s,
         "snr": status.snr,
         "seconds_to_first_nonempty_slot": status.seconds_to_first_nonempty_slot,
@@ -680,15 +681,15 @@ def get_history(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(spacex.api.device.device_pb2.Request(get_history={}))
+            stub = device_pb2_grpc.DeviceStub(channel)
+            response = stub.Handle(device_pb2.Request(get_history={}))
         return response.dish_get_history
 
     while True:
         channel, reused = context.get_channel()
         try:
-            stub = spacex.api.device.device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(spacex.api.device.device_pb2.Request(get_history={}))
+            stub = device_pb2_grpc.DeviceStub(channel)
+            response = stub.Handle(device_pb2.Request(get_history={}))
             return response.dish_get_history
         except grpc.RpcError:
             context.close()
