@@ -54,6 +54,7 @@ python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=.
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/dish.proto
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi.proto
 python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/wifi_config.proto
+python3 -m grpc_tools.protoc --descriptor_set_in=../dish.protoset --python_out=. --grpc_python_out=. spacex/api/device/transceiver.proto
 ```
 Then move the resulting files to where the Python scripts can find them in the import path, such as in the same directory as the scripts themselves.
 
