@@ -374,6 +374,9 @@ def status_field_names():
         A tuple with 3 lists, with status data field names, alert detail field
         names, and obstruction detail field names, in that order.
     """
+    if not import_ok:
+        with grpc.insecure_channel("192.168.100.1:9200") as channel:
+            import_protocols(channel)
     alert_names = []
     for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
@@ -410,6 +413,9 @@ def status_field_types():
         A tuple with 3 lists, with status data field types, alert detail field
         types, and obstruction detail field types, in that order.
     """
+    if not import_ok:
+        with grpc.insecure_channel("192.168.100.1:9200") as channel:
+            import_protocols(channel)
     return [
         str,  # id
         str,  # hardware_version

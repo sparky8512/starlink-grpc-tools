@@ -30,7 +30,7 @@ Note that the Python package versions available from various Linux distributions
 
 ### Generating the gRPC protocol modules
 
-This step is no longer required, as the grpc scripts can now get the protocol modules classes at run time via reflection, but generating the protocol modules will improve script startup time, and it would be a good idea to at least stash away the protoset file emitted by `grpcurl` in case SpaceX ever turns off server reflection in the dish software.
+This step is no longer required, as the grpc scripts can now get the protocol module classes at run time via reflection, but generating the protocol modules will improve script startup time, and it would be a good idea to at least stash away the protoset file emitted by `grpcurl` in case SpaceX ever turns off server reflection in the dish software.
 
 The grpc scripts require some generated code to support the specific gRPC protocol messages used. These would normally be generated from .proto files that specify those messages, but to date (2020-Dec), SpaceX has not publicly released such files. The gRPC service running on the dish appears to have [server reflection](https://github.com/grpc/grpc/blob/master/doc/server-reflection.md) enabled, though. `grpcurl` can use that to extract a protoset file, and the `protoc` compiler can use that to make the necessary generated code:
 ```shell script
