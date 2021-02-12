@@ -77,10 +77,12 @@ terminal has determined to be obstructed.
     of area (time?) within that wedge that the user terminal has determined to
     be obstructed between it and the satellites with which it communicates.
     The values are expressed as a fraction of total, not a fraction of the
-    wedge, so max value for each element should be 1/12. The first element in
-    the sequence represents the wedge that spans exactly North to 30 degrees
-    East of North, and subsequent wedges rotate 30 degrees further in the same
-    direction. (It's not clear if this will hold true at all latitudes.)
+    wedge, so max value for each element should be something like 1/12, but
+    may vary from wedge to wedge if they are weighted differently. The first
+    element in the sequence represents the wedge that spans exactly North to
+    30 degrees East of North, and subsequent wedges rotate 30 degrees further
+    in the same direction. (It's not clear if this will hold true at all
+    latitudes.)
 : **valid_s** : It is unclear what this field means exactly, but it appears to
     be a measure of how complete the data is that the user terminal uses to
     determine obstruction locations.
