@@ -302,9 +302,29 @@ import statistics
 
 import grpc
 
-from spacex.api.device import device_pb2
-from spacex.api.device import device_pb2_grpc
-from spacex.api.device import dish_pb2
+try:
+    from spacex.api.device import device_pb2
+    from spacex.api.device import device_pb2_grpc
+    from spacex.api.device import dish_pb2
+    import_ok = True
+except ImportError:
+    from yagrc import importer
+    import_ok = False
+
+
+def import_protocols(channel):
+    grpc_importer = importer.GrpcImporter()
+    grpc_importer.configure(
+        channel, filenames=["spacex/api/device/device.proto", "spacex/api/device/dish.proto"])
+
+    global device_pb2
+    global device_pb2_grpc
+    global dish_pb2
+    from spacex.api.device import device_pb2
+    from spacex.api.device import device_pb2_grpc
+    from spacex.api.device import dish_pb2
+    global import_ok
+    import_ok = True
 
 
 class GrpcError(Exception):
@@ -426,6 +446,8 @@ def get_status(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
+            if not import_ok:
+                import_protocols(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_status={}))
         return response.dish_get_status
@@ -433,6 +455,8 @@ def get_status(context=None):
     while True:
         channel, reused = context.get_channel()
         try:
+            if not import_ok:
+                import_protocols(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_status={}))
             return response.dish_get_status
@@ -683,6 +707,8 @@ def get_history(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
+            if not import_ok:
+                import_protocols(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_history={}))
         return response.dish_get_history
@@ -690,6 +716,8 @@ def get_history(context=None):
     while True:
         channel, reused = context.get_channel()
         try:
+            if not import_ok:
+                import_protocols(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_history={}))
             return response.dish_get_history

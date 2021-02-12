@@ -1,0 +1,6 @@
+grpcio>=1.12.0
+grpcio-tools>=1.20.0
+protobuf>=3.6.0
+yagrc>=1.0.1
+paho-mqtt>=1.5.1
+influxdb>=5.3.1
