@@ -83,6 +83,11 @@ terminal has determined to be obstructed.
     30 degrees East of North, and subsequent wedges rotate 30 degrees further
     in the same direction. (It's not clear if this will hold true at all
     latitudes.)
+: **raw_wedges_fraction_obstructed** : A 12 element sequence. Wedges
+    presumably correlate with the ones in *wedges_fraction_obstructed*, but
+    the exact relationship is unknown. The numbers in this one are generally
+    higher and may represent fraction of the wedge, in which case max value
+    for each element should be 1.
 : **valid_s** : It is unclear what this field means exactly, but it appears to
     be a measure of how complete the data is that the user terminal uses to
     determine obstruction locations.
@@ -399,6 +404,7 @@ def status_field_names():
         "seconds_obstructed",
     ], [
         "wedges_fraction_obstructed[12]",
+        "raw_wedges_fraction_obstructed[12]",
         "valid_s",
     ], alert_names
 
@@ -434,6 +440,7 @@ def status_field_types():
         float,  # seconds_obstructed
     ], [
         float,  # wedges_fraction_obstructed[]
+        float,  # raw_wedges_fraction_obstructed[]
         float,  # valid_s
     ], [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
 
@@ -542,6 +549,7 @@ def status_data(context=None):
         "seconds_obstructed": status.obstruction_stats.last_24h_obstructed_s,
     }, {
         "wedges_fraction_obstructed[]": status.obstruction_stats.wedge_abs_fraction_obstructed,
+        "raw_wedges_fraction_obstructed[]": status.obstruction_stats.wedge_fraction_obstructed,
         "valid_s": status.obstruction_stats.valid_s,
     }, alerts
 

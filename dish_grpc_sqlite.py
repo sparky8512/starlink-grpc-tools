@@ -31,7 +31,7 @@ import time
 import dish_common
 import starlink_grpc
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class Terminated(Exception):
@@ -49,6 +49,11 @@ def parse_args():
     parser.add_argument("database", help="Database file to use")
 
     group = parser.add_argument_group(title="sqlite database options")
+    group.add_argument("-f",
+                       "--force",
+                       action="store_true",
+                       help="Override database schema downgrade protection; may result in "
+                       "discarded data")
     group.add_argument("-k",
                        "--skip-query",
                        action="store_true",
@@ -151,16 +156,23 @@ def ensure_schema(opts, conn):
         cur.close()
         return
 
-    if opts.verbose:
-        if version[0]:
-            print("Upgrading schema from version:", version)
-        else:
+    if not version or not version[0]:
+        if opts.verbose:
             print("Initializing new database")
+        create_tables(conn, "")
+    elif version[0] > SCHEMA_VERSION and not opts.force:
+        logging.error("Cowardly refusing to downgrade from schema version %s", version[0])
+        raise Terminated
+    else:
+        print("Converting from schema version:", version[0])
+        convert_tables(conn)
 
-    # If/when more fields get added or changed, the schema will have changed
-    # and this will have to handle the upgrade case. For now, just create the
-    # new tables.
+    cur.execute("PRAGMA user_version={0}".format(SCHEMA_VERSION))
+    cur.close()
+    conn.commit()
 
+
+def create_tables(conn, suffix):
     tables = {}
     name_groups = starlink_grpc.status_field_names()
     type_groups = starlink_grpc.status_field_types()
@@ -187,20 +199,45 @@ def ensure_schema(opts, conn):
             return "TEXT"
         raise TypeError
 
+    column_info = {}
+    cur = conn.cursor()
     for table, group_pairs in tables.items():
+        column_names = ["time", "id"]
         columns = ['"time" INTEGER NOT NULL', '"id" TEXT NOT NULL']
         for name_group, type_group in group_pairs:
             for name_item, type_item in zip(name_group, type_group):
                 name_item = dish_common.BRACKETS_RE.match(name_item).group(1)
                 if name_item != "id":
                     columns.append('"{0}" {1}'.format(name_item, sql_type(type_item)))
-        sql = 'CREATE TABLE "{0}" ({1}, PRIMARY KEY("time","id"))'.format(table, ", ".join(columns))
+                    column_names.append(name_item)
+        cur.execute('DROP TABLE IF EXISTS "{0}{1}"'.format(table, suffix))
+        sql = 'CREATE TABLE "{0}{1}" ({2}, PRIMARY KEY("time","id"))'.format(
+            table, suffix, ", ".join(columns))
         cur.execute(sql)
-
-    cur.execute("PRAGMA user_version={0}".format(SCHEMA_VERSION))
-
+        column_info[table] = column_names
     cur.close()
-    conn.commit()
+
+    return column_info
+
+
+def convert_tables(conn):
+    new_column_info = create_tables(conn, "_new")
+    conn.row_factory = sqlite3.Row
+    old_cur = conn.cursor()
+    new_cur = conn.cursor()
+    for table, new_columns in new_column_info.items():
+        old_cur.execute('SELECT * FROM "{0}"'.format(table))
+        old_columns = set(x[0] for x in old_cur.description)
+        new_columns = tuple(x for x in new_columns if x in old_columns)
+        sql = 'INSERT OR REPLACE INTO "{0}_new" ({1}) VALUES ({2})'.format(
+            table, ",".join('"' + x + '"' for x in new_columns),
+            ",".join(repeat("?", len(new_columns))))
+        new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
+        new_cur.execute('DROP TABLE "{0}"'.format(table))
+        new_cur.execute('ALTER TABLE {0}_new RENAME TO {0}'.format(table))
+    old_cur.close()
+    new_cur.close()
+    conn.row_factory = None
 
 
 def main():
@@ -214,10 +251,10 @@ def main():
 
     signal.signal(signal.SIGTERM, handle_sigterm)
     gstate.sql_conn = sqlite3.connect(opts.database)
-    ensure_schema(opts, gstate.sql_conn)
 
     rc = 0
     try:
+        ensure_schema(opts, gstate.sql_conn)
         next_loop = time.monotonic()
         while True:
             rc = loop_body(opts, gstate)
