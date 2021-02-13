@@ -60,13 +60,19 @@ def create_arg_parser(output_description, bulk_history=True):
                        dest="samples",
                        help="Parse all valid samples")
     if bulk_history:
-        sample_help = ("Number of data samples to parse; in bulk mode, applies to first loop "
+        sample_help = ("Number of data samples to parse; normally applies to first loop "
                        "iteration only, default: -1 in bulk mode, loop interval if loop interval "
                        "set, else " + str(SAMPLES_DEFAULT))
+        no_counter_help = ("Don't track sample counter across loop iterations in non-bulk "
+                           "modes; keep using samples option value instead")
     else:
-        sample_help = ("Number of data samples to parse, default: loop interval, if set, else " +
+        sample_help = ("Number of data samples to parse; normally applies to first loop "
+                       "iteration only, default: loop interval, if set, else " +
                        str(SAMPLES_DEFAULT))
+        no_counter_help = ("Don't track sample counter across loop iterations; keep using "
+                           "samples option value instead")
     group.add_argument("-s", "--samples", type=int, help=sample_help)
+    group.add_argument("-j", "--no-counter", action="store_true", help=no_counter_help)
 
     return parser
 
@@ -124,7 +130,10 @@ def conn_error(opts, msg, *args):
 class GlobalState:
     """A class for keeping state across loop iterations."""
     def __init__(self):
+        # counter for bulk_history:
         self.counter = None
+        # counter for history stats:
+        self.counter_stats = None
         self.timestamp = None
         self.dish_id = None
         self.context = starlink_grpc.ChannelContext()
@@ -200,8 +209,13 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             print("Using dish ID: " + gstate.dish_id)
 
     if opts.history_stats_mode:
+        start = gstate.counter_stats
+        parse_samples = opts.samples if start is None else -1
         try:
-            groups = starlink_grpc.history_stats(opts.samples, opts.verbose, context=gstate.context)
+            groups = starlink_grpc.history_stats(parse_samples,
+                                                 start=start,
+                                                 verbose=opts.verbose,
+                                                 context=gstate.context)
             general, ping, runlen, latency, loaded, usage = groups[0:6]
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting ping stats: %s", str(e))
@@ -217,6 +231,8 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             add_data(loaded, "ping_stats")
         if "usage" in opts.mode:
             add_data(usage, "usage")
+        if not opts.no_counter:
+            gstate.counter_stats = general["end_counter"]
 
     if opts.bulk_mode and add_bulk:
         return get_bulk_data(opts, gstate, add_bulk)

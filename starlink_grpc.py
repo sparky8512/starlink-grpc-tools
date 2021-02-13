@@ -862,7 +862,7 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples, verbose=False, context=None):
+def history_stats(parse_samples, start=None, verbose=False, context=None):
     """Fetch, parse, and compute the packet loss stats.
 
     Note:
@@ -897,6 +897,7 @@ def history_stats(parse_samples, verbose=False, context=None):
 
     sample_range, parse_samples, current = _compute_sample_range(history,
                                                                  parse_samples,
+                                                                 start=start,
                                                                  verbose=verbose)
 
     tot = 0.0
