@@ -1018,10 +1018,12 @@ def history_stats(parse_samples, start=None, verbose=False, context=None):
 
     rtt_all.sort(key=lambda x: x[0])
     wmean_all, wdeciles_all = weighted_mean_and_quantiles(rtt_all, 10)
-    if rtt_full:
+    if len(rtt_full) > 1:
         deciles_full = [min(rtt_full)]
         deciles_full.extend(statistics.quantiles(rtt_full, n=10, method="inclusive"))
         deciles_full.append(max(rtt_full))
+    elif rtt_full:
+        deciles_full = [rtt_full[0]] * 11
     else:
         deciles_full = [None] * 11
 
