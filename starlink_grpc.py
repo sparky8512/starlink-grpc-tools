@@ -765,6 +765,9 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     if start is None or start < current - parse_samples:
         start = current - parse_samples
 
+    if start == current:
+        return range(0), 0, current
+
     # This is ring buffer offset, so both index to oldest data sample and
     # index to next data sample after the newest one.
     end_offset = current % samples
