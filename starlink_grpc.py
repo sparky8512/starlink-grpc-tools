@@ -308,28 +308,21 @@ import statistics
 import grpc
 
 try:
-    from spacex.api.device import device_pb2
-    from spacex.api.device import device_pb2_grpc
-    from spacex.api.device import dish_pb2
-    import_ok = True
-except ImportError:
     from yagrc import importer
-    import_ok = False
+    importer.add_lazy_packages(["spacex.api.device"])
+    imports_pending = True
+except (ImportError, AttributeError):
+    imports_pending = False
+
+from spacex.api.device import device_pb2
+from spacex.api.device import device_pb2_grpc
+from spacex.api.device import dish_pb2
 
 
-def import_protocols(channel):
-    grpc_importer = importer.GrpcImporter()
-    grpc_importer.configure(
-        channel, filenames=["spacex/api/device/device.proto", "spacex/api/device/dish.proto"])
-
-    global device_pb2
-    global device_pb2_grpc
-    global dish_pb2
-    from spacex.api.device import device_pb2
-    from spacex.api.device import device_pb2_grpc
-    from spacex.api.device import dish_pb2
-    global import_ok
-    import_ok = True
+def resolve_imports(channel):
+    importer.resolve_lazy_imports(channel)
+    global imports_pending
+    imports_pending = False
 
 
 class GrpcError(Exception):
@@ -379,9 +372,9 @@ def status_field_names():
         A tuple with 3 lists, with status data field names, alert detail field
         names, and obstruction detail field names, in that order.
     """
-    if not import_ok:
+    if imports_pending:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            import_protocols(channel)
+            resolve_imports(channel)
     alert_names = []
     for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
@@ -419,9 +412,9 @@ def status_field_types():
         A tuple with 3 lists, with status data field types, alert detail field
         types, and obstruction detail field types, in that order.
     """
-    if not import_ok:
+    if imports_pending:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            import_protocols(channel)
+            resolve_imports(channel)
     return [
         str,  # id
         str,  # hardware_version
@@ -459,8 +452,8 @@ def get_status(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            if not import_ok:
-                import_protocols(channel)
+            if imports_pending:
+                resolve_imports(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_status={}))
         return response.dish_get_status
@@ -468,8 +461,8 @@ def get_status(context=None):
     while True:
         channel, reused = context.get_channel()
         try:
-            if not import_ok:
-                import_protocols(channel)
+            if imports_pending:
+                resolve_imports(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_status={}))
             return response.dish_get_status
@@ -721,8 +714,8 @@ def get_history(context=None):
     """
     if context is None:
         with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            if not import_ok:
-                import_protocols(channel)
+            if imports_pending:
+                resolve_imports(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_history={}))
         return response.dish_get_history
@@ -730,8 +723,8 @@ def get_history(context=None):
     while True:
         channel, reused = context.get_channel()
         try:
-            if not import_ok:
-                import_protocols(channel)
+            if imports_pending:
+                resolve_imports(channel)
             stub = device_pb2_grpc.DeviceStub(channel)
             response = stub.Handle(device_pb2.Request(get_history={}))
             return response.dish_get_history
