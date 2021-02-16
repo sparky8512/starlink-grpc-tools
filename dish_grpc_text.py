@@ -85,13 +85,18 @@ def print_header(opts):
                 header.append(name)
 
     if opts.satus_mode:
-        status_names, obstruct_names, alert_names = starlink_grpc.status_field_names()
+        context = starlink_grpc.ChannelContext(target=opts.target)
+        try:
+            name_groups = starlink_grpc.status_field_names(context=context)
+        except starlink_grpc.GrpcError as e:
+            dish_common.conn_error(opts, "Failure reflecting status field names: %s", str(e))
+            return 1
         if "status" in opts.mode:
-            header_add(status_names)
+            header_add(name_groups[0])
         if "obstruction_detail" in opts.mode:
-            header_add(obstruct_names)
+            header_add(name_groups[1])
         if "alert_detail" in opts.mode:
-            header_add(alert_names)
+            header_add(name_groups[2])
 
     if opts.bulk_mode:
         general, bulk = starlink_grpc.history_bulk_field_names()
@@ -114,6 +119,7 @@ def print_header(opts):
             header_add(usage)
 
     print(",".join(header))
+    return 0
 
 
 def loop_body(opts, gstate):
@@ -180,10 +186,10 @@ def main():
     logging.basicConfig(format="%(levelname)s: %(message)s")
 
     if opts.print_header:
-        print_header(opts)
-        sys.exit(0)
+        rc = print_header(opts)
+        sys.exit(rc)
 
-    gstate = dish_common.GlobalState()
+    gstate = dish_common.GlobalState(target=opts.target)
 
     try:
         next_loop = time.monotonic()

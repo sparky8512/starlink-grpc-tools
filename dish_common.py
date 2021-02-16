@@ -43,6 +43,10 @@ def create_arg_parser(output_description, bulk_history=True):
     parser.bulk_history = bulk_history
 
     group = parser.add_argument_group(title="General options")
+    group.add_argument("-g",
+                       "--target",
+                       help="host:port of dish to query, default is the standard IP address "
+                       "and port (192.168.100.1:9200)")
     group.add_argument("-h", "--help", action="help", help="Be helpful")
     group.add_argument("-t",
                        "--loop-interval",
@@ -129,14 +133,14 @@ def conn_error(opts, msg, *args):
 
 class GlobalState:
     """A class for keeping state across loop iterations."""
-    def __init__(self):
+    def __init__(self, target=None):
         # counter for bulk_history:
         self.counter = None
         # counter for history stats:
         self.counter_stats = None
         self.timestamp = None
         self.dish_id = None
-        self.context = starlink_grpc.ChannelContext()
+        self.context = starlink_grpc.ChannelContext(target=target)
 
     def shutdown(self):
         self.context.close()
@@ -183,12 +187,12 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             if "status" in opts.mode:
                 if opts.need_id and gstate.dish_id is None:
                     conn_error(opts, "Dish unreachable and ID unknown, so not recording state")
-                else:
-                    if opts.verbose:
-                        print("Dish unreachable")
-                    if "status" in opts.mode:
-                        add_item("state", "DISH_UNREACHABLE", "status")
-                        return 0
+                    return 1
+                if opts.verbose:
+                    print("Dish unreachable")
+                add_item("state", "DISH_UNREACHABLE", "status")
+                return 0
+            conn_error(opts, "Failure getting status: %s", str(e))
             return 1
         if opts.need_id:
             gstate.dish_id = status_data["id"]

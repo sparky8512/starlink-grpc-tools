@@ -345,9 +345,9 @@ class ChannelContext:
     `close()` should be called on the object when it is no longer
     in use.
     """
-    def __init__(self, target="192.168.100.1:9200"):
+    def __init__(self, target=None):
         self.channel = None
-        self.target = target
+        self.target = "192.168.100.1:9200" if target is None else target
 
     def get_channel(self):
         reused = True
@@ -362,19 +362,53 @@ class ChannelContext:
         self.channel = None
 
 
-def status_field_names():
+def call_with_channel(function, *args, context=None, **kwargs):
+    """Call a function with a channel object.
+
+    Args:
+        function: Function to call with channel as first arg.
+        args: Additional args to pass to function
+        context (ChannelContext): Optionally provide a channel for (re)use.
+            If not set, a new default channel will be used and then closed.
+        kwargs: Additional keyword args to pass to function.
+    """
+    if context is None:
+        with grpc.insecure_channel("192.168.100.1:9200") as channel:
+            return function(channel, *args, **kwargs)
+
+    while True:
+        channel, reused = context.get_channel()
+        try:
+            return function(channel, *args, **kwargs)
+        except grpc.RpcError:
+            context.close()
+            if not reused:
+                raise
+
+
+def status_field_names(context=None):
     """Return the field names of the status data.
 
     Note:
         See module level docs regarding brackets in field names.
 
+    Args:
+        context (ChannelContext): Optionally provide a channel for (re)use
+            with reflection service.
+
     Returns:
         A tuple with 3 lists, with status data field names, alert detail field
         names, and obstruction detail field names, in that order.
+
+    Raises:
+        GrpcError: No user terminal is currently available to resolve imports
+            via reflection.
     """
     if imports_pending:
-        with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            resolve_imports(channel)
+        try:
+            call_with_channel(resolve_imports, context=context)
+        except grpc.RpcError as e:
+            raise GrpcError(e)
     alert_names = []
     for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
@@ -402,19 +436,29 @@ def status_field_names():
     ], alert_names
 
 
-def status_field_types():
+def status_field_types(context=None):
     """Return the field types of the status data.
 
     Return the type classes for each field. For sequence types, the type of
     element in the sequence is returned, not the type of the sequence.
 
+    Args:
+        context (ChannelContext): Optionally provide a channel for (re)use
+            with reflection service.
+
     Returns:
         A tuple with 3 lists, with status data field types, alert detail field
         types, and obstruction detail field types, in that order.
+
+    Raises:
+        GrpcError: No user terminal is currently available to resolve imports
+            via reflection.
     """
     if imports_pending:
-        with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            resolve_imports(channel)
+        try:
+            call_with_channel(resolve_imports, context=context)
+        except grpc.RpcError as e:
+            raise GrpcError(e)
     return [
         str,  # id
         str,  # hardware_version
@@ -450,26 +494,14 @@ def get_status(context=None):
     Raises:
         grpc.RpcError: Communication or service error.
     """
-    if context is None:
-        with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            if imports_pending:
-                resolve_imports(channel)
-            stub = device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(device_pb2.Request(get_status={}))
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(get_status={}))
         return response.dish_get_status
 
-    while True:
-        channel, reused = context.get_channel()
-        try:
-            if imports_pending:
-                resolve_imports(channel)
-            stub = device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(device_pb2.Request(get_status={}))
-            return response.dish_get_status
-        except grpc.RpcError:
-            context.close()
-            if not reused:
-                raise
+    return call_with_channel(grpc_call, context=context)
 
 
 def get_id(context=None):
@@ -506,8 +538,7 @@ def status_data(context=None):
         values, in that order.
 
     Raises:
-        GrpcError: Failed getting history info from the Starlink user
-            terminal.
+        GrpcError: Failed getting status info from the Starlink user terminal.
     """
     try:
         status = get_status(context)
@@ -712,26 +743,14 @@ def get_history(context=None):
     Raises:
         grpc.RpcError: Communication or service error.
     """
-    if context is None:
-        with grpc.insecure_channel("192.168.100.1:9200") as channel:
-            if imports_pending:
-                resolve_imports(channel)
-            stub = device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(device_pb2.Request(get_history={}))
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(get_history={}))
         return response.dish_get_history
 
-    while True:
-        channel, reused = context.get_channel()
-        try:
-            if imports_pending:
-                resolve_imports(channel)
-            stub = device_pb2_grpc.DeviceStub(channel)
-            response = stub.Handle(device_pb2.Request(get_history={}))
-            return response.dish_get_history
-        except grpc.RpcError:
-            context.close()
-            if not reused:
-                raise
+    return call_with_channel(grpc_call, context=context)
 
 
 def _compute_sample_range(history, parse_samples, start=None, verbose=False):

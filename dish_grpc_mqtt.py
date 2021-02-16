@@ -111,7 +111,7 @@ def main():
 
     logging.basicConfig(format="%(levelname)s: %(message)s")
 
-    gstate = dish_common.GlobalState()
+    gstate = dish_common.GlobalState(target=opts.target)
 
     try:
         next_loop = time.monotonic()

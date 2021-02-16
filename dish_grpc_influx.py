@@ -278,7 +278,7 @@ def main():
 
     logging.basicConfig(format="%(levelname)s: %(message)s")
 
-    gstate = dish_common.GlobalState()
+    gstate = dish_common.GlobalState(target=opts.target)
     gstate.points = []
     gstate.deferred_points = []
     gstate.timebase_synced = opts.skip_query

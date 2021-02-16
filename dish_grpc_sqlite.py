@@ -148,34 +148,39 @@ def loop_body(opts, gstate):
     return rc
 
 
-def ensure_schema(opts, conn):
+def ensure_schema(opts, conn, context):
     cur = conn.cursor()
     cur.execute("PRAGMA user_version")
     version = cur.fetchone()
     if version and version[0] == SCHEMA_VERSION:
         cur.close()
-        return
+        return 0
 
-    if not version or not version[0]:
-        if opts.verbose:
-            print("Initializing new database")
-        create_tables(conn, "")
-    elif version[0] > SCHEMA_VERSION and not opts.force:
-        logging.error("Cowardly refusing to downgrade from schema version %s", version[0])
-        raise Terminated
-    else:
-        print("Converting from schema version:", version[0])
-        convert_tables(conn)
+    try:
+        if not version or not version[0]:
+            if opts.verbose:
+                print("Initializing new database")
+            create_tables(conn, context, "")
+        elif version[0] > SCHEMA_VERSION and not opts.force:
+            logging.error("Cowardly refusing to downgrade from schema version %s", version[0])
+            return 1
+        else:
+            print("Converting from schema version:", version[0])
+            convert_tables(conn, context)
+        cur.execute("PRAGMA user_version={0}".format(SCHEMA_VERSION))
+        conn.commit()
+        return 0
+    except starlink_grpc.GrpcError as e:
+        dish_common.conn_error(opts, "Failure reflecting status fields: %s", str(e))
+        return 1
+    finally:
+        cur.close()
 
-    cur.execute("PRAGMA user_version={0}".format(SCHEMA_VERSION))
-    cur.close()
-    conn.commit()
 
-
-def create_tables(conn, suffix):
+def create_tables(conn, context, suffix):
     tables = {}
-    name_groups = starlink_grpc.status_field_names()
-    type_groups = starlink_grpc.status_field_types()
+    name_groups = starlink_grpc.status_field_names(context=context)
+    type_groups = starlink_grpc.status_field_types(context=context)
     tables["status"] = zip(name_groups, type_groups)
 
     name_groups = starlink_grpc.history_stats_field_names()
@@ -220,8 +225,8 @@ def create_tables(conn, suffix):
     return column_info
 
 
-def convert_tables(conn):
-    new_column_info = create_tables(conn, "_new")
+def convert_tables(conn, context):
+    new_column_info = create_tables(conn, context, "_new")
     conn.row_factory = sqlite3.Row
     old_cur = conn.cursor()
     new_cur = conn.cursor()
@@ -245,7 +250,7 @@ def main():
 
     logging.basicConfig(format="%(levelname)s: %(message)s")
 
-    gstate = dish_common.GlobalState()
+    gstate = dish_common.GlobalState(target=opts.target)
     gstate.points = []
     gstate.deferred_points = []
 
@@ -254,7 +259,9 @@ def main():
 
     rc = 0
     try:
-        ensure_schema(opts, gstate.sql_conn)
+        rc = ensure_schema(opts, gstate.sql_conn, gstate.context)
+        if rc:
+            sys.exit(rc)
         next_loop = time.monotonic()
         while True:
             rc = loop_body(opts, gstate)
