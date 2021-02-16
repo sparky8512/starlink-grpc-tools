@@ -113,6 +113,8 @@ their nature, but the field names are pretty self-explanatory.
     *alerts*.
 : **alert_unexpected_location** : Alert corresponding with bit 3 (bit mask 8)
     in *alerts*.
+: **alert_mast_not_near_vertical** : Alert corresponding with bit 4 (bit mask
+    16) in *alerts*.
 
 General history data
 --------------------

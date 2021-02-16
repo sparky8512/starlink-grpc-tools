@@ -12,6 +12,14 @@ at https://github.com/sparky8512/starlink-grpc-tools/issues explaining the use
 case and how you would rather see it. This only affects a few fields, since
 most of the useful data is not in arrays.
 
+Note that using this script to record the alert_detail group mode will tend to
+trip schema-related errors when new alert types are added to the dish
+software. The error message will include something like "table status has no
+column named alert_foo", where "foo" is the newly added alert type. To work
+around this rare occurrence, you can pass the -f option to force a schema
+update. Alternatively, instead of using the alert_detail mode, you can use the
+alerts bitmask in the status group.
+
 NOTE: The Starlink user terminal does not include time values with its
 history or status data, so this script uses current system time to compute
 the timestamps it writes into the database. It is recommended to run this
@@ -52,8 +60,8 @@ def parse_args():
     group.add_argument("-f",
                        "--force",
                        action="store_true",
-                       help="Override database schema downgrade protection; may result in "
-                       "discarded data")
+                       help="Force schema conversion, even if it results in downgrade; may "
+                       "result in discarded data")
     group.add_argument("-k",
                        "--skip-query",
                        action="store_true",
@@ -139,7 +147,7 @@ def loop_body(opts, gstate):
         gstate.sql_conn.commit()
     except sqlite3.OperationalError as e:
         # these are not necessarily fatal, but also not much can do about
-        logging.error("Unexpected error from database, discarding %s rows: %s", rows_written, e)
+        logging.error("Unexpected error from database, discarding data: %s", e)
         rc = 1
     else:
         if opts.verbose:
@@ -152,7 +160,7 @@ def ensure_schema(opts, conn, context):
     cur = conn.cursor()
     cur.execute("PRAGMA user_version")
     version = cur.fetchone()
-    if version and version[0] == SCHEMA_VERSION:
+    if version and version[0] == SCHEMA_VERSION and not opts.force:
         cur.close()
         return 0
 
