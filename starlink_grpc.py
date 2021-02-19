@@ -797,7 +797,7 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     return sample_range, current - start, current
 
 
-def history_bulk_data(parse_samples, start=None, verbose=False, context=None):
+def history_bulk_data(parse_samples, start=None, verbose=False, context=None, history=None):
     """Fetch history data for a range of samples.
 
     Args:
@@ -818,6 +818,8 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None):
         verbose (bool): Optionally produce verbose output.
         context (ChannelContext): Optionally provide a channel for reuse
             across repeated calls.
+        history: Optionally provide the history data to use instead of fetching
+            it, from a prior call to `get_history`.
 
     Returns:
         A tuple with 2 dicts, the first mapping general data names to their
@@ -832,10 +834,11 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None):
         GrpcError: Failed getting history info from the Starlink user
             terminal.
     """
-    try:
-        history = get_history(context)
-    except grpc.RpcError as e:
-        raise GrpcError(e)
+    if history is None:
+        try:
+            history = get_history(context)
+        except grpc.RpcError as e:
+            raise GrpcError(e)
 
     sample_range, parsed_samples, current = _compute_sample_range(history,
                                                                   parse_samples,
@@ -879,7 +882,7 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples, start=None, verbose=False, context=None):
+def history_stats(parse_samples, start=None, verbose=False, context=None, history=None):
     """Fetch, parse, and compute the packet loss stats.
 
     Note:
@@ -891,6 +894,8 @@ def history_stats(parse_samples, start=None, verbose=False, context=None):
         verbose (bool): Optionally produce verbose output.
         context (ChannelContext): Optionally provide a channel for reuse
             across repeated calls.
+        history: Optionally provide the history data to use instead of fetching
+            it, from a prior call to `get_history`.
 
     Returns:
         A tuple with 6 dicts, mapping general data names, ping drop stat
@@ -907,10 +912,11 @@ def history_stats(parse_samples, start=None, verbose=False, context=None):
         GrpcError: Failed getting history info from the Starlink user
             terminal.
     """
-    try:
-        history = get_history(context)
-    except grpc.RpcError as e:
-        raise GrpcError(e)
+    if history is None:
+        try:
+            history = get_history(context)
+        except grpc.RpcError as e:
+            raise GrpcError(e)
 
     sample_range, parse_samples, current = _compute_sample_range(history,
                                                                  parse_samples,
