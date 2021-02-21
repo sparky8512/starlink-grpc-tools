@@ -11,7 +11,7 @@ All the tools that pull data from the dish expect to be able to reach it at the 
 
 Running the scripts within a [Docker](https://www.docker.com/) container requires Docker to be installed. Information about how to install that can be found at https://docs.docker.com/engine/install/
 
-`parseJsonHistory.py` operates on a JSON format data representation of the protocol buffer messages, such as that output by [gRPCurl](https://github.com/fullstorydev/grpcurl). The command lines below assume `grpcurl` is installed in the runtime PATH. If that's not the case, just substitute in the full path to the command.
+`dish_json_text.py` operates on a JSON format data representation of the protocol buffer messages, such as that output by [gRPCurl](https://github.com/fullstorydev/grpcurl). The command lines below assume `grpcurl` is installed in the runtime PATH. If that's not the case, just substitute in the full path to the command.
 
 ### Required Python modules
 
@@ -63,7 +63,7 @@ For example, all the currently available status groups can be output by doing:
 python3 dish_grpc_text.py status obstruction_detail alert_detail
 ```
 
-By default, `dish_grpc_text.py` (and `parseJsonHistory.py`, described below) will output in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
+By default, `dish_grpc_text.py` (and `dish_json_text.py`, described below) will output in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
 
 To collect and record packet loss summary stats at the top of every hour, you could put something like the following in your user crontab (assuming you have moved the scripts to ~/bin and made them executable):
 ```
