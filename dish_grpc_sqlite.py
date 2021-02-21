@@ -118,7 +118,7 @@ def loop_body(opts, gstate):
     rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)
 
     if opts.bulk_mode and not rc:
-        if gstate.counter is None and opts.samples < 0:
+        if gstate.counter is None and not opts.skip_query and opts.bulk_samples < 0:
             gstate.timestamp, gstate.counter = query_counter(opts, gstate)
         rc = dish_common.get_bulk_data(opts, gstate, cb_add_bulk)
 
