@@ -883,7 +883,7 @@ def history_ping_stats(parse_samples, verbose=False, context=None):
 
 
 def history_stats(parse_samples, start=None, verbose=False, context=None, history=None):
-    """Fetch, parse, and compute the packet loss stats.
+    """Fetch, parse, and compute ping and usage stats.
 
     Note:
         See module level docs regarding brackets in field names.
@@ -918,10 +918,10 @@ def history_stats(parse_samples, start=None, verbose=False, context=None, histor
         except grpc.RpcError as e:
             raise GrpcError(e)
 
-    sample_range, parse_samples, current = _compute_sample_range(history,
-                                                                 parse_samples,
-                                                                 start=start,
-                                                                 verbose=verbose)
+    sample_range, parsed_samples, current = _compute_sample_range(history,
+                                                                  parse_samples,
+                                                                  start=start,
+                                                                  verbose=verbose)
 
     tot = 0.0
     count_full_drop = 0
@@ -1051,7 +1051,7 @@ def history_stats(parse_samples, start=None, verbose=False, context=None, histor
         deciles_full = [None] * 11
 
     return {
-        "samples": parse_samples,
+        "samples": parsed_samples,
         "end_counter": current,
     }, {
         "total_ping_drop": tot,

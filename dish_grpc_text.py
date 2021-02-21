@@ -65,7 +65,7 @@ def parse_args():
 
     opts = dish_common.run_arg_parser(parser, no_stdout_errors=True)
 
-    if len(opts.mode) > 1 and "bulk_history" in opts.mode:
+    if (opts.history_stats_mode or opts.satus_mode) and opts.bulk_mode:
         parser.error("bulk_history cannot be combined with other modes for CSV output")
 
     return opts
@@ -148,8 +148,8 @@ def loop_body(opts, gstate):
     def cb_add_bulk(bulk, count, timestamp, counter):
         if opts.verbose:
             print("Time range (UTC):      {0} -> {1}".format(
-                datetime.fromtimestamp(timestamp).isoformat(),
-                datetime.fromtimestamp(timestamp + count).isoformat()))
+                datetime.utcfromtimestamp(timestamp).isoformat(),
+                datetime.utcfromtimestamp(timestamp + count).isoformat()))
             for key, val in bulk.items():
                 print("{0:22} {1}".format(key + ":", ", ".join(str(subval) for subval in val)))
             if opts.loop_interval > 0.0:
@@ -157,7 +157,7 @@ def loop_body(opts, gstate):
         else:
             for i in range(count):
                 timestamp += 1
-                fields = [datetime.fromtimestamp(timestamp).isoformat()]
+                fields = [datetime.utcfromtimestamp(timestamp).isoformat()]
                 fields.extend(["" if val[i] is None else str(val[i]) for val in bulk.values()])
                 print(",".join(fields))
 

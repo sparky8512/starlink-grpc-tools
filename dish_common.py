@@ -74,8 +74,8 @@ def create_arg_parser(output_description, bulk_history=True):
                        metavar="N")
     if bulk_history:
         sample_help = ("Number of data samples to parse; normally applies to first loop "
-                       "iteration only, default: -1 in bulk mode, loop interval if loop interval "
-                       "set, else " + str(SAMPLES_DEFAULT))
+                       "iteration only, default: all in bulk mode, loop interval if loop "
+                       "interval set, else " + str(SAMPLES_DEFAULT))
         no_counter_help = ("Don't track sample counter across loop iterations in non-bulk "
                            "modes; keep using samples option value instead")
     else:
