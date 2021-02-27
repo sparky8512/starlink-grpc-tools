@@ -65,11 +65,6 @@ python3 dish_grpc_text.py status obstruction_detail alert_detail
 
 By default, `dish_grpc_text.py` (and `dish_json_text.py`, described below) will output in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
 
-To collect and record packet loss summary stats at the top of every hour, you could put something like the following in your user crontab (assuming you have moved the scripts to ~/bin and made them executable):
-```
-00 * * * * [ -e ~/dishStats.csv ] || ~/bin/dish_grpc_text.py -H >~/dishStats.csv; ~/bin/dish_grpc_text.py ping_drop >>~/dishStats.csv
-```
-
 By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```shell script
 python3 dish_grpc_influx.py -t 30 [... probably other args to specify server options ...] status
@@ -131,11 +126,9 @@ You'll probably want to run with the `-t` option to `dish_grpc_influx.py` to col
 
 ## To Be Done (Maybe)
 
-Maybe more data backend options. If there's one you'd like to see supported, please open a feature request issue.
-
 There are `reboot` and `dish_stow` requests in the Device protocol, too, so it should be trivial to write a command that initiates dish reboot and stow operations. These are easy enough to do with `grpcurl`, though, as there is no need to parse through the response data. For that matter, they're easy enough to do with the Starlink app.
 
-Proper Python packaging, since the dependency list keeps growing....
+No further data collection functionality is planned at this time. If there's something you'd like to see added, please feel free to open a feature request issue. Bear in mind, though, that functionality will be limited to that which the Starlink gRPC services support. In general, those services are limited to what is required by the Starlink app, so unless the app has some related feature, it is unlikely the gRPC services will be sufficient to implement it in these tools.
 
 ## Other Tidbits
 
@@ -143,7 +136,7 @@ The Starlink Android app actually uses port 9201 instead of 9200. Both appear to
 
 The Starlink router also exposes a gRPC service, on ports 9000 (HTTP/2.0) and 9001 (HTTP/1.1).
 
-The file `get_history_notes.txt` has my original ramblings on how to interpret the history buffer data (with the JSON format naming). It may be of interest if you're interested in pulling the `get_history` grpc data directly and don't want to dig through the convoluted logic in the `starlink-grpc` module.
+The file `get_history_notes.txt` has my original ramblings on how to interpret the history buffer data (with the JSON format naming). It may be of interest if you want to pull the `get_history` grpc data directly and don't want to dig through the convoluted logic in the `starlink_grpc` module.
 
 ## Related Projects
 

@@ -190,14 +190,27 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
     Returns:
         1 if there were any failures getting data from the dish, otherwise 0.
     """
-    def add_data(data, category):
-        for key, val in data.items():
-            name, start, seq = BRACKETS_RE.match(key).group(1, 4, 5)
-            if seq is None:
-                add_item(name, val, category)
-            else:
-                add_sequence(name, val, category, int(start) if start else 0)
+    rc = get_status_data(opts, gstate, add_item, add_sequence)
 
+    if opts.history_stats_mode and not rc:
+        rc = get_history_stats(opts, gstate, add_item, add_sequence)
+
+    if opts.bulk_mode and add_bulk and not rc:
+        rc = get_bulk_data(opts, gstate, add_bulk)
+
+    return rc
+
+
+def add_data(data, category, add_item, add_sequence):
+    for key, val in data.items():
+        name, start, seq = BRACKETS_RE.match(key).group(1, 4, 5)
+        if seq is None:
+            add_item(name, val, category)
+        else:
+            add_sequence(name, val, category, int(start) if start else 0)
+
+
+def get_status_data(opts, gstate, add_item, add_sequence):
     if opts.satus_mode:
         try:
             groups = starlink_grpc.status_data(context=gstate.context)
@@ -217,11 +230,11 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             gstate.dish_id = status_data["id"]
             del status_data["id"]
         if "status" in opts.mode:
-            add_data(status_data, "status")
+            add_data(status_data, "status", add_item, add_sequence)
         if "obstruction_detail" in opts.mode:
-            add_data(obstruct_detail, "status")
+            add_data(obstruct_detail, "status", add_item, add_sequence)
         if "alert_detail" in opts.mode:
-            add_data(alert_detail, "status")
+            add_data(alert_detail, "status", add_item, add_sequence)
     elif opts.need_id and gstate.dish_id is None:
         try:
             gstate.dish_id = starlink_grpc.get_id(context=gstate.context)
@@ -231,9 +244,11 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
         if opts.verbose:
             print("Using dish ID: " + gstate.dish_id)
 
-    if not opts.history_stats_mode and not (opts.bulk_mode and add_bulk):
-        return 0
+    return 0
 
+
+def get_history_stats(opts, gstate, add_item, add_sequence):
+    """Fetch history stats.  See `get_data` for details."""
     try:
         history = starlink_grpc.get_history(context=gstate.context)
     except grpc.RpcError as e:
@@ -242,17 +257,6 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
         if history is None:
             return 1
 
-    if opts.history_stats_mode:
-        get_history_stats(opts, gstate, add_data, history)
-
-    if opts.bulk_mode and add_bulk:
-        return get_bulk_data(opts, gstate, add_bulk)
-
-    return 0
-
-
-def get_history_stats(opts, gstate, add_data, history):
-    """Fetch history stats.  See `get_data` for details."""
     if history and gstate.prev_history and history.current < gstate.prev_history.current:
         if opts.verbose:
             print("Dish reboot detected. Restarting loop polling count.")
@@ -277,19 +281,21 @@ def get_history_stats(opts, gstate, add_data, history):
                                          verbose=opts.verbose,
                                          history=history)
     general, ping, runlen, latency, loaded, usage = groups[0:6]
-    add_data(general, "ping_stats")
+    add_data(general, "ping_stats", add_item, add_sequence)
     if "ping_drop" in opts.mode:
-        add_data(ping, "ping_stats")
+        add_data(ping, "ping_stats", add_item, add_sequence)
     if "ping_run_length" in opts.mode:
-        add_data(runlen, "ping_stats")
+        add_data(runlen, "ping_stats", add_item, add_sequence)
     if "ping_latency" in opts.mode:
-        add_data(latency, "ping_stats")
+        add_data(latency, "ping_stats", add_item, add_sequence)
     if "ping_loaded_latency" in opts.mode:
-        add_data(loaded, "ping_stats")
+        add_data(loaded, "ping_stats", add_item, add_sequence)
     if "usage" in opts.mode:
-        add_data(usage, "usage")
+        add_data(usage, "usage", add_item, add_sequence)
     if not opts.no_counter:
         gstate.counter_stats = general["end_counter"]
+
+    return 0
 
 
 def get_bulk_data(opts, gstate, add_bulk):

@@ -69,15 +69,17 @@ def parse_args():
 
     opts = dish_common.run_arg_parser(parser, need_id=True)
 
+    opts.skip_query |= opts.no_counter
+
     return opts
 
 
-def query_counter(opts, gstate):
+def query_counter(opts, gstate, column, table):
     now = time.time()
     cur = gstate.sql_conn.cursor()
     cur.execute(
-        'SELECT "time", "counter" FROM "history" WHERE "time"<? AND "id"=? '
-        'ORDER BY "time" DESC LIMIT 1', (now, gstate.dish_id))
+        'SELECT "time", "{0}" FROM "{1}" WHERE "time"<? AND "id"=? '
+        'ORDER BY "time" DESC LIMIT 1'.format(column, table), (now, gstate.dish_id))
     row = cur.fetchone()
     cur.close()
 
@@ -102,7 +104,6 @@ def loop_body(opts, gstate):
         tables[category][key] = ",".join(str(subv) if subv is not None else "" for subv in val)
 
     def cb_add_bulk(bulk, count, timestamp, counter):
-        nonlocal hist_cols
         if len(hist_cols) == 2:
             hist_cols.extend(bulk.keys())
             hist_cols.append("counter")
@@ -115,11 +116,16 @@ def loop_body(opts, gstate):
             hist_rows.append(row)
 
     now = int(time.time())
-    rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)
+    rc = dish_common.get_status_data(opts, gstate, cb_add_item, cb_add_sequence)
+
+    if opts.history_stats_mode and not rc:
+        if gstate.counter_stats is None and not opts.skip_query and opts.samples < 0:
+            _, gstate.counter_stats = query_counter(opts, gstate, "end_counter", "ping_stats")
+        rc = dish_common.get_history_stats(opts, gstate, cb_add_item, cb_add_sequence)
 
     if opts.bulk_mode and not rc:
         if gstate.counter is None and not opts.skip_query and opts.bulk_samples < 0:
-            gstate.timestamp, gstate.counter = query_counter(opts, gstate)
+            gstate.timestamp, gstate.counter = query_counter(opts, gstate, "counter", "history")
         rc = dish_common.get_bulk_data(opts, gstate, cb_add_bulk)
 
     rows_written = 0
