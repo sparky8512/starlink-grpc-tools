@@ -4,6 +4,14 @@
 This script pulls the current status info and/or metrics computed from the
 history data and publishes them to the specified MQTT broker either once or
 in a periodic loop.
+
+Data will be published to the following topic names:
+
+: starlink/dish_status/*id_value*/*field_name* : Current status data
+: starlink/dish_ping_stats/*id_value*/*field_name* : Ping history statistics
+: starlink/dish_usage/*id_value*/*field_name* : Usage history statistics
+
+Where *id_value* is the *id* value from the dish status information.
 """
 
 import logging

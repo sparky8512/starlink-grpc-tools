@@ -5,6 +5,13 @@ This script pulls the current status info and/or metrics computed from the
 history data and writes them to the specified sqlite database either once or
 in a periodic loop.
 
+Requested data will be written into the following tables:
+
+: status : Current status data
+: history : Bulk history data
+: ping_stats : Ping history statistics
+: usage : Usage history statistics
+
 Array data is currently written to the database as text strings of comma-
 separated values, which may not be the best method for some use cases. If you
 find yourself wishing they were handled better, please open a feature request

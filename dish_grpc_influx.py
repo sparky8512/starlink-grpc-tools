@@ -5,6 +5,14 @@ This script pulls the current status info and/or metrics computed from the
 history data and writes them to the specified InfluxDB database either once
 or in a periodic loop.
 
+Data will be written into the requested database with the following
+measurement / series names:
+
+: spacex.starlink.user_terminal.status : Current status data
+: spacex.starlink.user_terminal.history : Bulk history data
+: spacex.starlink.user_terminal.ping_stats : Ping history statistics
+: spacex.starlink.user_terminal.usage : Usage history statistics
+
 NOTE: The Starlink user terminal does not include time values with its
 history or status data, so this script uses current system time to compute
 the timestamps it sends to InfluxDB. It is recommended to run this script on
