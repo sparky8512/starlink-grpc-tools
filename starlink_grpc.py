@@ -107,14 +107,16 @@ their nature, but the field names are pretty self-explanatory.
 
 : **alert_motors_stuck** : Alert corresponding with bit 0 (bit mask 1) in
     *alerts*.
-: **alert_thermal_throttle** : Alert corresponding with bit 1 (bit mask 2) in
+: **alert_thermal_shutdown** : Alert corresponding with bit 1 (bit mask 2) in
     *alerts*.
-: **alert_thermal_shutdown** : Alert corresponding with bit 2 (bit mask 4) in
+: **alert_thermal_throttle** : Alert corresponding with bit 2 (bit mask 4) in
     *alerts*.
 : **alert_unexpected_location** : Alert corresponding with bit 3 (bit mask 8)
     in *alerts*.
 : **alert_mast_not_near_vertical** : Alert corresponding with bit 4 (bit mask
     16) in *alerts*.
+: **slow_ethernet_speeds** : Alert corresponding with bit 5 (bit mask 32) in
+    *alerts*.
 
 General history data
 --------------------
@@ -555,7 +557,8 @@ def status_data(context=None):
     for field in status.alerts.DESCRIPTOR.fields:
         value = getattr(status.alerts, field.name)
         alerts["alert_" + field.name] = value
-        alert_bits |= (1 if value else 0) << (field.index)
+        if field.number < 65:
+            alert_bits |= (1 if value else 0) << (field.number - 1)
 
     return {
         "id": status.device_info.id,

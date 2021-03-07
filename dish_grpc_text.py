@@ -4,6 +4,11 @@
 This script pulls the current status info and/or metrics computed from the
 history data and prints them to stdout either once or in a periodic loop.
 By default, it will print the results in CSV format.
+
+Note that using this script to record the alert_detail group mode as CSV
+data is not recommended, because the number of alerts and their relative
+order in the output can change with the dish software. Instead of using
+the alert_detail mode, you can use the alerts bitmask in the status group.
 """
 
 from datetime import datetime
