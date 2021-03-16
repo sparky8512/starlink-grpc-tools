@@ -378,14 +378,8 @@ def history_stats(filename, parse_samples, verbose=False):
 
     rtt_all.sort(key=lambda x: x[0])
     wmean_all, wdeciles_all = weighted_mean_and_quantiles(rtt_all, 10)
-    if len(rtt_full) > 1:
-        deciles_full = [min(rtt_full)]
-        deciles_full.extend(statistics.quantiles(rtt_full, n=10, method="inclusive"))
-        deciles_full.append(max(rtt_full))
-    elif rtt_full:
-        deciles_full = [rtt_full[0]] * 11
-    else:
-        deciles_full = [None] * 11
+    rtt_full.sort()
+    mean_full, deciles_full = weighted_mean_and_quantiles(tuple((x, 1.0) for x in rtt_full), 10)
 
     return {
         "samples": parsed_samples,
@@ -407,7 +401,7 @@ def history_stats(filename, parse_samples, verbose=False):
     }, {
         "mean_all_ping_latency": wmean_all,
         "deciles_all_ping_latency[]": wdeciles_all,
-        "mean_full_ping_latency": statistics.fmean(rtt_full) if rtt_full else None,
+        "mean_full_ping_latency": mean_full,
         "deciles_full_ping_latency[]": deciles_full,
         "stdev_full_ping_latency": statistics.pstdev(rtt_full) if rtt_full else None,
     }, {
