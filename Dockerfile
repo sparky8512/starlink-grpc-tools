@@ -3,16 +3,14 @@ LABEL maintainer="neurocis <neurocis@neurocis.me>"
 
 RUN true && \
 \
-# Install GRPCurl
-wget https://github.com/fullstorydev/grpcurl/releases/download/v1.8.0/grpcurl_1.8.0_linux_x86_64.tar.gz && \
-tar -xvf grpcurl_1.8.0_linux_x86_64.tar.gz grpcurl && \
-chown root:root grpcurl && \
-chmod 755 grpcurl && \
-mv grpcurl /usr/bin/. && \
-rm grpcurl_1.8.0_linux_x86_64.tar.gz && \
-\
 # Install python prerequisites
-pip3 install grpcio grpcio-tools paho-mqtt influxdb
+pip3 install \
+    grpcio==1.36.1 \
+    paho-mqtt==1.5.1 \
+    influxdb==5.3.1 python-dateutil==2.8.1 pytz==2021.1 requests==2.25.1 \
+        certifi==2020.12.5 chardet==4.0.0 idna==2.10 urllib3==1.26.4 \
+        six==1.15.0 msgpack==1.0.2 \
+    yagrc==1.1.0 grpcio-reflection==1.36.1 protobuf==3.15.6
 
 ADD . /app
 WORKDIR /app
