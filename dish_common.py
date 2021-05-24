@@ -50,6 +50,10 @@ def create_arg_parser(output_description, bulk_history=True):
                        help="host:port of dish to query, default is the standard IP address "
                        "and port (192.168.100.1:9200)")
     group.add_argument("-h", "--help", action="help", help="Be helpful")
+    group.add_argument("-N",
+                       "--numeric",
+                       action="store_true",
+                       help="Record boolean values as 1 and 0 instead of True and False")
     group.add_argument("-t",
                        "--loop-interval",
                        type=float,
@@ -201,13 +205,25 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
     return rc
 
 
-def add_data(data, category, add_item, add_sequence):
+def add_data_normal(data, category, add_item, add_sequence):
     for key, val in data.items():
         name, start, seq = BRACKETS_RE.match(key).group(1, 4, 5)
         if seq is None:
             add_item(name, val, category)
         else:
             add_sequence(name, val, category, int(start) if start else 0)
+
+
+def add_data_numeric(data, category, add_item, add_sequence):
+    for key, val in data.items():
+        name, start, seq = BRACKETS_RE.match(key).group(1, 4, 5)
+        if seq is None:
+            add_item(name, int(val) if isinstance(val, int) else val, category)
+        else:
+            add_sequence(name,
+                         [int(subval) if isinstance(subval, int) else subval for subval in val],
+                         category,
+                         int(start) if start else 0)
 
 
 def get_status_data(opts, gstate, add_item, add_sequence):
@@ -229,6 +245,7 @@ def get_status_data(opts, gstate, add_item, add_sequence):
         if opts.need_id:
             gstate.dish_id = status_data["id"]
             del status_data["id"]
+        add_data = add_data_numeric if opts.numeric else add_data_normal
         if "status" in opts.mode:
             add_data(status_data, "status", add_item, add_sequence)
         if "obstruction_detail" in opts.mode:
@@ -281,6 +298,7 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
                                          verbose=opts.verbose,
                                          history=history)
     general, ping, runlen, latency, loaded, usage = groups[0:6]
+    add_data = add_data_numeric if opts.numeric else add_data_normal
     add_data(general, "ping_stats", add_item, add_sequence)
     if "ping_drop" in opts.mode:
         add_data(ping, "ping_stats", add_item, add_sequence)
@@ -334,7 +352,14 @@ def get_bulk_data(opts, gstate, add_bulk):
                 new_counter, datetime.fromtimestamp(timestamp, tz=timezone.utc)))
         timestamp -= parsed_samples
 
-    add_bulk(bulk, parsed_samples, timestamp, new_counter - parsed_samples)
+    if opts.numeric:
+        add_bulk(
+            {
+                k: [int(subv) if isinstance(subv, int) else subv for subv in v]
+                for k, v in bulk.items()
+            }, parsed_samples, timestamp, new_counter - parsed_samples)
+    else:
+        add_bulk(bulk, parsed_samples, timestamp, new_counter - parsed_samples)
 
     gstate.counter = new_counter
     gstate.timestamp = timestamp + parsed_samples
