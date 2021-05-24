@@ -133,22 +133,27 @@ def loop_body(opts, gstate):
     else:
         csv_data = [datetime.utcnow().replace(microsecond=0).isoformat()]
 
+    def xform(val):
+        return "" if val is None else str(val)
+
     def cb_data_add_item(name, val, category):
         if opts.verbose:
-            csv_data.append("{0:22} {1}".format(VERBOSE_FIELD_MAP.get(name, name) + ":", val))
+            csv_data.append("{0:22} {1}".format(
+                VERBOSE_FIELD_MAP.get(name, name) + ":", xform(val)))
         else:
             # special case for get_status failure: this will be the lone item added
             if name == "state" and val == "DISH_UNREACHABLE":
                 csv_data.extend(["", "", "", val])
             else:
-                csv_data.append(str(val))
+                csv_data.append(xform(val))
 
     def cb_data_add_sequence(name, val, category, start):
         if opts.verbose:
             csv_data.append("{0:22} {1}".format(
-                VERBOSE_FIELD_MAP.get(name, name) + ":", ", ".join(str(subval) for subval in val)))
+                VERBOSE_FIELD_MAP.get(name, name) + ":",
+                ", ".join(xform(subval) for subval in val)))
         else:
-            csv_data.extend(str(subval) for subval in val)
+            csv_data.extend(xform(subval) for subval in val)
 
     def cb_add_bulk(bulk, count, timestamp, counter):
         if opts.verbose:
@@ -156,14 +161,14 @@ def loop_body(opts, gstate):
                 datetime.utcfromtimestamp(timestamp).isoformat(),
                 datetime.utcfromtimestamp(timestamp + count).isoformat()))
             for key, val in bulk.items():
-                print("{0:22} {1}".format(key + ":", ", ".join(str(subval) for subval in val)))
+                print("{0:22} {1}".format(key + ":", ", ".join(xform(subval) for subval in val)))
             if opts.loop_interval > 0.0:
                 print()
         else:
             for i in range(count):
                 timestamp += 1
                 fields = [datetime.utcfromtimestamp(timestamp).isoformat()]
-                fields.extend(["" if val[i] is None else str(val[i]) for val in bulk.values()])
+                fields.extend([xform(val[i]) for val in bulk.values()])
                 print(",".join(fields))
 
     rc = dish_common.get_data(opts,
