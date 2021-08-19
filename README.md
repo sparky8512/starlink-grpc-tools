@@ -76,6 +76,10 @@ Some of the scripts (currently only the InfluxDB one) also support specifying op
 
 `dish_grpc_influx.py`, `dish_grpc_sqlite.py`, and `dish_grpc_text.py` also support a bulk history mode that collects and writes the full second-by-second data instead of summary stats. To select bulk mode, use `bulk_history` for the mode argument. You'll probably also want to use the `-t` option to have it run in a loop.
 
+#### Polling interval
+
+A recent (as of 2021-Aug) change in the dish firmware appears to have reduced the amount of history data returned from the most recent 12 hours to the most recent 15 minutes, so if you are using the `-t` option to poll either bulk history or history-based statistics, you should choose an interval less than 900 seconds; otherwise, you will not capture all the data.
+
 ### The JSON parser script
 
 `dish_json_text.py` is similar to `dish_grpc_text.py`, but it takes JSON format input from a file instead of pulling it directly from the dish via grpc call. It also does not support the status info modes, because those are easy enough to interpret directly from the JSON data. The easiest way to use it is to pipe the `grpcurl` command directly into it. For example:
