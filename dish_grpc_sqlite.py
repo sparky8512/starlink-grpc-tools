@@ -46,7 +46,7 @@ import time
 import dish_common
 import starlink_grpc
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 class Terminated(Exception):

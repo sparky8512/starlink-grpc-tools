@@ -66,6 +66,19 @@ This group holds information about the current state of the user terminal.
     not packets were able to be transmitted or received. See also
     *count_obstructed* in general ping drop history data; this value will be
     equal to that value when computed across all available history samples.
+: **obstruction_duration** : Average consecutive time, in seconds, the user
+    terminal has detected its signal to be obstructed for a period of time
+    that it considers "prolonged", or None if no such obstructions were
+    recorded.
+: **obstruction_interval** : Average time, in seconds, between the start of
+    such "prolonged" obstructions, or None if no such obstructions were
+    recorded.
+: **direction_azimuth** : Azimuth angle, in degrees, of the direction in which
+    the user terminal's dish antenna is physically pointing. Note that this
+    generally is not the exact direction of the satellite with which the user
+    terminal is communicating.
+: **direction_elevation** : Elevation angle, in degrees, of the direction in
+    which the user terminal's dish antenna is physically pointing.
 
 Obstruction detail status data
 ------------------------------
@@ -433,6 +446,10 @@ def status_field_names(context=None):
         "fraction_obstructed",
         "currently_obstructed",
         "seconds_obstructed",
+        "obstruction_duration",
+        "obstruction_interval",
+        "direction_azimuth",
+        "direction_elevation",
     ], [
         "wedges_fraction_obstructed[12]",
         "raw_wedges_fraction_obstructed[12]",
@@ -479,6 +496,10 @@ def status_field_types(context=None):
         float,  # fraction_obstructed
         bool,  # currently_obstructed
         float,  # seconds_obstructed
+        float,  # obstruction_duration
+        float,  # obstruction_interval
+        float,  # direction_azimuth
+        float,  # direction_elevation
     ], [
         float,  # wedges_fraction_obstructed[]
         float,  # raw_wedges_fraction_obstructed[]
@@ -560,6 +581,13 @@ def status_data(context=None):
         if field.number < 65:
             alert_bits |= (1 if value else 0) << (field.number - 1)
 
+    if status.obstruction_stats.avg_prolonged_obstruction_valid:
+        obstruction_duration = status.obstruction_stats.avg_prolonged_obstruction_duration_s
+        obstruction_interval = status.obstruction_stats.avg_prolonged_obstruction_interval_s
+    else:
+        obstruction_duration = None
+        obstruction_interval = None
+
     return {
         "id": status.device_info.id,
         "hardware_version": status.device_info.hardware_version,
@@ -576,6 +604,10 @@ def status_data(context=None):
         "fraction_obstructed": status.obstruction_stats.fraction_obstructed,
         "currently_obstructed": status.obstruction_stats.currently_obstructed,
         "seconds_obstructed": status.obstruction_stats.last_24h_obstructed_s,
+        "obstruction_duration": obstruction_duration,
+        "obstruction_interval": obstruction_interval,
+        "direction_azimuth": status.boresight_azimuth_deg,
+        "direction_elevation": status.boresight_elevation_deg,
     }, {
         "wedges_fraction_obstructed[]": status.obstruction_stats.wedge_abs_fraction_obstructed,
         "raw_wedges_fraction_obstructed[]": status.obstruction_stats.wedge_fraction_obstructed,
