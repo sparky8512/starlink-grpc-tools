@@ -80,6 +80,12 @@ Some of the scripts (currently only the InfluxDB one) also support specifying op
 
 A recent (as of 2021-Aug) change in the dish firmware appears to have reduced the amount of history data returned from the most recent 12 hours to the most recent 15 minutes, so if you are using the `-t` option to poll either bulk history or history-based statistics, you should choose an interval less than 900 seconds; otherwise, you will not capture all the data.
 
+Computing history statistics (one or more of groups `ping_drop`, `ping_run_length`, `ping_latency`, `ping_loaded_latency`, and `usage`) across periods longer than the 15 minute history buffer may be done by combining the `-t` and `-o` options. The history data will be polled at the interval specified by the `-t` option, but it will be aggregated the number of times specified by the `-o` option and statistics will be computed against the aggregated data which will be a period of the `-t` option value times the `-o` option value. For example, the following:
+```shell script
+python3 dish_grpc_text.py -t 60 -o 60 ping_drop 
+```
+will poll history data once per minute, but compute statistics only once per hour. This also reduces data loss due to a dish reboot, since the `-o` option will aggregate across reboots, too.
+
 ### The JSON parser script
 
 `dish_json_text.py` is similar to `dish_grpc_text.py`, but it takes JSON format input from a file instead of pulling it directly from the dish via grpc call. It also does not support the status info modes, because those are easy enough to interpret directly from the JSON data. The easiest way to use it is to pipe the `grpcurl` command directly into it. For example:

@@ -72,9 +72,9 @@ def create_arg_parser(output_description, bulk_history=True):
     group.add_argument("-o",
                        "--poll-loops",
                        type=int,
-                       help="Poll history for N loops or until reboot detected, before computing "
-                       "history stats; this allows for a smaller loop interval with less loss of "
-                       "data when the dish reboots",
+                       help="Poll history for N loops and aggregate data before computing history "
+                       "stats; this allows for a smaller loop interval with less loss of data "
+                       "when the dish reboots",
                        metavar="N")
     if bulk_history:
         sample_help = ("Number of data samples to parse; normally applies to first loop "
@@ -163,7 +163,7 @@ class GlobalState:
         self.dish_id = None
         self.context = starlink_grpc.ChannelContext(target=target)
         self.poll_count = 0
-        self.prev_history = None
+        self.accum_history = None
 
     def shutdown(self):
         self.context.close()
@@ -270,33 +270,35 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
         history = starlink_grpc.get_history(context=gstate.context)
     except grpc.RpcError as e:
         conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
-        history = gstate.prev_history
-        if history is None:
-            return 1
+        history = None
 
-    if history and gstate.prev_history and history.current < gstate.prev_history.current:
-        if opts.verbose:
-            print("Dish reboot detected. Restarting loop polling count.")
-        # process saved history data and keep the new data for next time
-        history, gstate.prev_history = gstate.prev_history, history
-        # the newly saved data counts as a loop, so advance 1 past reset point
-        gstate.poll_count = opts.poll_loops - 2
-    elif gstate.poll_count > 0:
-        gstate.poll_count -= 1
-        gstate.prev_history = history
-        return
+    # Accumulate polled history data into gstate.accum_history, even if there
+    # was a dish reboot.
+    if gstate.accum_history:
+        if history is not None:
+            gstate.accum_history = starlink_grpc.concatenate_history(gstate.accum_history,
+                                                                     history,
+                                                                     verbose=opts.verbose)
     else:
-        # if no --poll-loops option set, opts.poll_loops gets set to 1, so
-        # poll_count will always be 0 and prev_history will always be None
-        gstate.prev_history = None
-        gstate.poll_count = opts.poll_loops - 1
+        gstate.accum_history = history
+
+    if gstate.poll_count < opts.poll_loops - 1:
+        gstate.poll_count += 1
+        return 0
+
+    # This can happen if all polling attempts failed. Verbose output has
+    # already happened, so just return.
+    if gstate.accum_history is None:
+        return 1
+
+    gstate.poll_count = 0
 
     start = gstate.counter_stats
     parse_samples = opts.samples if start is None else -1
     groups = starlink_grpc.history_stats(parse_samples,
                                          start=start,
                                          verbose=opts.verbose,
-                                         history=history)
+                                         history=gstate.accum_history)
     general, ping, runlen, latency, loaded, usage = groups[0:6]
     add_data = add_data_numeric if opts.numeric else add_data_normal
     add_data(general, "ping_stats", add_item, add_sequence)
@@ -312,6 +314,8 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
         add_data(usage, "usage", add_item, add_sequence)
     if not opts.no_counter:
         gstate.counter_stats = general["end_counter"]
+
+    gstate.accum_history = None
 
     return 0
 

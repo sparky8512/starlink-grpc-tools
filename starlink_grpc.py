@@ -60,12 +60,14 @@ This group holds information about the current state of the user terminal.
     it and the satellites with which it communicates.
 : **currently_obstructed** : Most recent sample value. See bulk history data
     for detail.
-: **seconds_obstructed** : The amount of time within the history buffer
-    (currently the smaller of 12 hours or since last reboot), in seconds that
-    the user terminal determined to be obstructed, regardless of whether or
-    not packets were able to be transmitted or received. See also
+: **seconds_obstructed** : The amount of time within the history buffer,
+    in seconds, that the user terminal determined to be obstructed, regardless
+    of whether or not packets were able to be transmitted or received. See also
     *count_obstructed* in general ping drop history data; this value will be
     equal to that value when computed across all available history samples.
+    NOTE: The history buffer is now much smaller than it used to be, so this
+    field is probably either not very useful, or may be computed differently
+    by the user terminal than described above.
 : **obstruction_duration** : Average consecutive time, in seconds, the user
     terminal has detected its signal to be obstructed for a period of time
     that it considers "prolonged", or None if no such obstructions were
@@ -335,6 +337,9 @@ from spacex.api.device import device_pb2
 from spacex.api.device import device_pb2_grpc
 from spacex.api.device import dish_pb2
 
+HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
+                  "uplink_throughput_bps", "snr", "scheduled", "obstructed")
+
 
 def resolve_imports(channel):
     importer.resolve_lazy_imports(channel)
@@ -354,6 +359,10 @@ class GrpcError(Exception):
         else:
             msg = str(e)
         super().__init__(msg, *args, **kwargs)
+
+
+class UnwrappedHistory:
+    """Empty class for holding a copy of grpc history data."""
 
 
 class ChannelContext:
@@ -817,6 +826,10 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     if start == current:
         return range(0), 0, current
 
+    # Not a ring buffer is simple case.
+    if hasattr(history, "unwrapped"):
+        return range(samples - (current-start), samples), current - start, current
+
     # This is ring buffer offset, so both index to oldest data sample and
     # index to next data sample after the newest one.
     end_offset = current % samples
@@ -830,6 +843,64 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
         sample_range = chain(range(start_offset, samples), range(0, end_offset))
 
     return sample_range, current - start, current
+
+
+def concatenate_history(history1, history2, verbose=False):
+    """ Append the sample-dependent fields of one history object to another.
+
+    Note:
+        Samples data will be appended regardless of dish reboot or history
+        data ring buffer wrap, which may result in discontiguous sample data
+        with lost data.
+
+    Args:
+        history1: The grpc history object, such as one returned by a prior
+            call to `get_history`, or equivalent dict, to which to append.
+        history2: The grpc history object, such as one returned by a prior
+            call to `get_history`, from which to append.
+        verbose (bool): Optionally produce verbose output.
+
+    Returns:
+        An object with the unwrapped history data and the same attribute
+        fields as a grpc history object.
+    """
+    size2 = len(history2.pop_ping_drop_rate)
+    new_samples = history2.current - history1.current
+    if new_samples < 0:
+        if verbose:
+            print("Dish reboot detected. Appending anyway.")
+        new_samples = history2.current if history2.current < size2 else size2
+    elif new_samples > size2:
+        # This should probably go to stderr and not depend on verbose flag,
+        # but this layer of the code tries not to make that sort of logging
+        # policy decision, so honor requested verbosity.
+        if verbose:
+            print("WARNING: Appending discontiguous samples. Polling interval probably too short.")
+        new_samples = size2
+
+    unwrapped = UnwrappedHistory()
+    for field in HISTORY_FIELDS:
+        setattr(unwrapped, field, [])
+
+    if hasattr(history1, "unwrapped"):
+        # Make a copy so the input object is not modified.
+        for field in HISTORY_FIELDS:
+            getattr(unwrapped, field).extend(getattr(history1, field))
+    else:
+        sample_range, ignore1, ignore2 = _compute_sample_range(  # pylint: disable=unused-variable
+            history1, len(history1.pop_ping_drop_rate))
+        for i in sample_range:
+            for field in HISTORY_FIELDS:
+                getattr(unwrapped, field).append(getattr(history1, field)[i])
+        unwrapped.unwrapped = True
+
+    sample_range, ignore1, ignore2 = _compute_sample_range(history2, new_samples)  # pylint: disable=unused-variable
+    for i in sample_range:
+        for field in HISTORY_FIELDS:
+            getattr(unwrapped, field).append(getattr(history2, field)[i])
+
+    unwrapped.current = history2.current
+    return unwrapped
 
 
 def history_bulk_data(parse_samples, start=None, verbose=False, context=None, history=None):
