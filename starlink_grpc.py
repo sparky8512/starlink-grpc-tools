@@ -1182,3 +1182,50 @@ def history_stats(parse_samples, start=None, verbose=False, context=None, histor
         "download_usage": int(round(usage_down / 8)),
         "upload_usage": int(round(usage_up / 8)),
     }
+
+
+def get_obstruction_map(context=None):
+    """Fetch obstruction map data and return it in grpc structure format.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        grpc.RpcError: Communication or service error.
+    """
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(dish_get_obstruction_map={}))
+        return response.dish_get_obstruction_map
+
+    return call_with_channel(grpc_call, context=context)
+
+
+def obstruction_map(context=None):
+    """Fetch current obstruction map data.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls.
+
+    Returns:
+        A tuple of row data, each of which is a tuple of column data, which
+        hold floats indicating SNR info per direction in the range of 0.0 to
+        1.0 for valid data and -1.0 for invalid data. To get a flat
+        representation the SNR data instead, see `get_obstruction_map`.
+
+    Raises:
+        GrpcError: Failed getting status info from the Starlink user terminal.
+    """
+    try:
+        map_data = get_obstruction_map(context)
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+    cols = map_data.num_cols
+    return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
