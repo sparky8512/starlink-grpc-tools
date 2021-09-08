@@ -26,11 +26,13 @@ The scripts that use [MQTT](https://mqtt.org/) for output require the `paho-mqtt
 
 The scripts that use [InfluxDB](https://www.influxdata.com/products/influxdb/) for output require the `influxdb` Python package. Information about how to install that can be found at https://github.com/influxdata/influxdb-python. Note that this is the (slightly) older version of the InfluxDB client Python module, not the InfluxDB 2.0 client. It can still be made to work with an InfluxDB 2.0 server, but doing so requires using `influx v1` [CLI commands](https://docs.influxdata.com/influxdb/v2.0/reference/cli/influx/v1/) on the server to map the 1.x username, password, and database names to their 2.0 equivalents.
 
+The `dish_obstruction_map.py` script requires the `pypng` Python package. Information about how to install that can be found at https://pypng.readthedocs.io/en/latest/png.html#installation-and-overview
+
 Note that the Python package versions available from various Linux distributions (ie: installed via `apt-get` or similar) tend to run a bit behind those available to install via `pip`. While the distro packages should work OK as long as they aren't extremely old, they may not work as well as the later versions.
 
 ### Generating the gRPC protocol modules
 
-This step is no longer required, as the grpc scripts can now get the protocol module classes at run time via reflection, but generating the protocol modules will improve script startup time, and it would be a good idea to at least stash away the protoset file emitted by `grpcurl` in case SpaceX ever turns off server reflection in the dish software.
+This step is no longer required, as the grpc scripts can now get the protocol module classes at run time via reflection, but generating the protocol modules will improve script startup time, and it would be a good idea to at least stash away the protoset file emitted by `grpcurl` in case SpaceX ever turns off server reflection in the dish software. That being said, it's probably less error prone to use the run time reflection support rather than using the files generated in this step, so use your own judgement as to whether or not to proceed with this.
 
 The grpc scripts require some generated code to support the specific gRPC protocol messages used. These would normally be generated from .proto files that specify those messages, but to date (2020-Dec), SpaceX has not publicly released such files. The gRPC service running on the dish appears to have [server reflection](https://github.com/grpc/grpc/blob/master/doc/server-reflection.md) enabled, though. `grpcurl` can use that to extract a protoset file, and the `protoc` compiler can use that to make the necessary generated code:
 ```shell script
@@ -85,6 +87,19 @@ Computing history statistics (one or more of groups `ping_drop`, `ping_run_lengt
 python3 dish_grpc_text.py -t 60 -o 60 ping_drop 
 ```
 will poll history data once per minute, but compute statistics only once per hour. This also reduces data loss due to a dish reboot, since the `-o` option will aggregate across reboots, too.
+
+### The obstruction map script
+
+`dish_obstruction_map.py` is a little different in that it doesn't write to a database, but rather writes PNG images to the local filesystem. To get a single image of the current obstruction map using the default colors, you can do the following:
+```shell script
+python3 dish_obstruction_map.py obstructions.png
+```
+or to run in a loop writing a sequence of images once per hour, you can do the following:
+```shell script
+python3 dish_obstruction_map.py -t 3600 obstructions_%s.png
+```
+
+Run it with the `-h` command line option for full usage details, including control of the map colors and color modes.
 
 ### The JSON parser script
 

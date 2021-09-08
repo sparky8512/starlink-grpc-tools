@@ -6,10 +6,12 @@ reachable on the local network and writes a PNG image based on that data.
 """
 
 import argparse
+from datetime import datetime
 import logging
 import os
 import png
 import sys
+import time
 
 import starlink_grpc
 
@@ -19,9 +21,10 @@ DEFAULT_NO_DATA_COLOR = "00000000"
 DEFAULT_OBSTRUCTED_GREYSCALE = "FF00"
 DEFAULT_UNOBSTRUCTED_GREYSCALE = "FFFF"
 DEFAULT_NO_DATA_GREYSCALE = "0000"
+LOOP_TIME_DEFAULT = 0
 
 
-def run_loop(opts, context):
+def loop_body(opts, context):
     snr_data = starlink_grpc.obstruction_map(context)
 
     def pixel_bytes(row):
@@ -58,7 +61,12 @@ def run_loop(opts, context):
         # Open new stdout file to get binary mode
         out_file = os.fdopen(sys.stdout.fileno(), "wb", closefd=False)
     else:
-        out_file = open(opts.filename, "wb")
+        now = int(time.time())
+        filename = opts.filename.replace("%u", str(now))
+        filename = filename.replace("%d",
+                                    datetime.utcfromtimestamp(now).strftime("%Y_%m_%d_%H_%M_%S"))
+        filename = filename.replace("%s", str(opts.sequence))
+        out_file = open(filename, "wb")
     if not snr_data or not snr_data[0]:
         logging.error("Invalid SNR map data: Zero-length")
         return 1
@@ -68,16 +76,20 @@ def run_loop(opts, context):
                         greyscale=opts.greyscale)
     writer.write(out_file, (bytes(pixel_bytes(row)) for row in snr_data))
     out_file.close()
+
+    opts.sequence += 1
     return 0
 
 
-def main():
-    logging.basicConfig(format="%(levelname)s: %(message)s")
-
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Collect directional obstruction map data from a Starlink user terminal and "
         "emit it as a PNG image")
-    parser.add_argument("filename", help="The image file to write, or - to write to stdout")
+    parser.add_argument(
+        "filename",
+        help="The image file to write, or - to write to stdout; may be a template with the "
+        "following to be filled in per loop iteration: %%s for sequence number, %%d for UTC date "
+        "and time, %%u for seconds since Unix epoch.")
     parser.add_argument(
         "-o",
         "--obstructed-color",
@@ -97,20 +109,29 @@ def main():
         "-g",
         "--greyscale",
         action="store_true",
-        help=
-        "Emit a greyscale image instead of the default full color image; greyscale images use L or AL hex notation for the color options"
-    )
+        help="Emit a greyscale image instead of the default full color image; greyscale images "
+        "use L or AL hex notation for the color options")
     parser.add_argument(
         "-z",
         "--no-alpha",
         action="store_true",
-        help=
-        "Emit an image without alpha (transparency) channel instead of the default that includes alpha channel"
-    )
-    parser.add_argument("-t",
+        help="Emit an image without alpha (transparency) channel instead of the default that "
+        "includes alpha channel")
+    parser.add_argument("-e",
                         "--target",
                         help="host:port of dish to query, default is the standard IP address "
                         "and port (192.168.100.1:9200)")
+    parser.add_argument("-t",
+                        "--loop-interval",
+                        type=float,
+                        default=float(LOOP_TIME_DEFAULT),
+                        help="Loop interval in seconds or 0 for no loop, default: " +
+                        str(LOOP_TIME_DEFAULT))
+    parser.add_argument("-s",
+                        "--sequence",
+                        type=int,
+                        default=1,
+                        help="Starting sequence number for templatized filenames, default: 1")
     opts = parser.parse_args()
 
     if opts.obstructed_color is None:
@@ -135,11 +156,26 @@ def main():
             logging.error("Invalid hex number for %s", option)
             sys.exit(1)
 
+    return opts
+
+
+def main():
+    opts = parse_args()
+
+    logging.basicConfig(format="%(levelname)s: %(message)s")
+
     context = starlink_grpc.ChannelContext(target=opts.target)
 
     try:
-        # XXX: make this actually run in a loop...
-        rc = run_loop(opts, context)
+        next_loop = time.monotonic()
+        while True:
+            rc = loop_body(opts, context)
+            if opts.loop_interval > 0.0:
+                now = time.monotonic()
+                next_loop = max(next_loop + opts.loop_interval, now)
+                time.sleep(next_loop - now)
+            else:
+                break
     finally:
         context.close()
 
