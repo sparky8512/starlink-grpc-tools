@@ -807,7 +807,8 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
         print("current counter:       " + str(current))
         print("All samples:           " + str(samples))
 
-    samples = min(samples, current)
+    if not hasattr(history, "unwrapped"):
+        samples = min(samples, current)
 
     if verbose:
         print("Valid samples:         " + str(samples))
@@ -845,7 +846,7 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     return sample_range, current - start, current
 
 
-def concatenate_history(history1, history2, verbose=False):
+def concatenate_history(history1, history2, start=None, verbose=False):
     """ Append the sample-dependent fields of one history object to another.
 
     Note:
@@ -855,9 +856,13 @@ def concatenate_history(history1, history2, verbose=False):
 
     Args:
         history1: The grpc history object, such as one returned by a prior
-            call to `get_history`, or equivalent dict, to which to append.
+            call to `get_history`, or object with similar attributes, to which
+            to append.
         history2: The grpc history object, such as one returned by a prior
             call to `get_history`, from which to append.
+        start (int): Optional starting counter value to be applied to the
+            history1 data. See `history_bulk_data` documentation for more
+            details on how this parameter is used.
         verbose (bool): Optionally produce verbose output.
 
     Returns:
@@ -881,18 +886,13 @@ def concatenate_history(history1, history2, verbose=False):
     unwrapped = UnwrappedHistory()
     for field in HISTORY_FIELDS:
         setattr(unwrapped, field, [])
+    unwrapped.unwrapped = True
 
-    if hasattr(history1, "unwrapped"):
-        # Make a copy so the input object is not modified.
+    sample_range, ignore1, ignore2 = _compute_sample_range(  # pylint: disable=unused-variable
+        history1, len(history1.pop_ping_drop_rate), start=start)
+    for i in sample_range:
         for field in HISTORY_FIELDS:
-            getattr(unwrapped, field).extend(getattr(history1, field))
-    else:
-        sample_range, ignore1, ignore2 = _compute_sample_range(  # pylint: disable=unused-variable
-            history1, len(history1.pop_ping_drop_rate))
-        for i in sample_range:
-            for field in HISTORY_FIELDS:
-                getattr(unwrapped, field).append(getattr(history1, field)[i])
-        unwrapped.unwrapped = True
+            getattr(unwrapped, field).append(getattr(history1, field)[i])
 
     sample_range, ignore1, ignore2 = _compute_sample_range(history2, new_samples)  # pylint: disable=unused-variable
     for i in sample_range:
@@ -997,6 +997,9 @@ def history_stats(parse_samples, start=None, verbose=False, context=None, histor
     Args:
         parse_samples (int): Number of samples to process, or -1 to parse all
             available samples.
+        start (int): Optional starting counter value to be applied to the
+            history data. See `history_bulk_data` documentation for more
+            details on how this parameter is used.
         verbose (bool): Optionally produce verbose output.
         context (ChannelContext): Optionally provide a channel for reuse
             across repeated calls.

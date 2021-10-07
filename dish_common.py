@@ -276,8 +276,18 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
     # was a dish reboot.
     if gstate.accum_history:
         if history is not None:
+            # This gets too complicated to handle across reboots once the data
+            # has been accumulated, so just have concatenate do it on the
+            # first pass and use a value of 0 to remember it was done (as
+            # opposed to None, which is used for a different purpose).
+            if gstate.counter_stats:
+                start = gstate.counter_stats
+                gstate.counter_stats = 0
+            else:
+                start = None
             gstate.accum_history = starlink_grpc.concatenate_history(gstate.accum_history,
                                                                      history,
+                                                                     start=start,
                                                                      verbose=opts.verbose)
     else:
         gstate.accum_history = history
@@ -293,8 +303,8 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
 
     gstate.poll_count = 0
 
-    start = gstate.counter_stats
-    parse_samples = opts.samples if start is None else -1
+    start = gstate.counter_stats if gstate.counter_stats else None
+    parse_samples = opts.samples if gstate.counter_stats is None else -1
     groups = starlink_grpc.history_stats(parse_samples,
                                          start=start,
                                          verbose=opts.verbose,
