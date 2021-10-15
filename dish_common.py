@@ -130,8 +130,7 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
     opts.bulk_mode = "bulk_history" in opts.mode
 
     if opts.samples is None:
-        opts.samples = int(opts.loop_interval *
-                           opts.poll_loops) if opts.loop_interval >= 1.0 else SAMPLES_DEFAULT
+        opts.samples = int(opts.loop_interval) if opts.loop_interval >= 1.0 else SAMPLES_DEFAULT
         opts.bulk_samples = -1
     else:
         opts.bulk_samples = opts.samples
@@ -272,23 +271,25 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
         conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
         history = None
 
+    parse_samples = opts.samples if gstate.counter_stats is None else -1
+    start = gstate.counter_stats if gstate.counter_stats else None
+
     # Accumulate polled history data into gstate.accum_history, even if there
     # was a dish reboot.
     if gstate.accum_history:
         if history is not None:
-            # This gets too complicated to handle across reboots once the data
-            # has been accumulated, so just have concatenate do it on the
-            # first pass and use a value of 0 to remember it was done (as
-            # opposed to None, which is used for a different purpose).
-            if gstate.counter_stats:
-                start = gstate.counter_stats
-                gstate.counter_stats = 0
-            else:
-                start = None
             gstate.accum_history = starlink_grpc.concatenate_history(gstate.accum_history,
                                                                      history,
-                                                                     start=start,
+                                                                     samples1=parse_samples,
+                                                                     start1=start,
                                                                      verbose=opts.verbose)
+            # Counter tracking gets too complicated to handle across reboots
+            # once the data has been accumulated, so just have concatenate
+            # handle it on the first polled loop and use a value of 0 to
+            # remember it was done (as opposed to None, which is used for a
+            # different purpose).
+            if not opts.no_counter:
+                gstate.counter_stats = 0
     else:
         gstate.accum_history = history
 
@@ -303,8 +304,6 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
 
     gstate.poll_count = 0
 
-    start = gstate.counter_stats if gstate.counter_stats else None
-    parse_samples = opts.samples if gstate.counter_stats is None else -1
     groups = starlink_grpc.history_stats(parse_samples,
                                          start=start,
                                          verbose=opts.verbose,

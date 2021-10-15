@@ -846,8 +846,8 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     return sample_range, current - start, current
 
 
-def concatenate_history(history1, history2, start=None, verbose=False):
-    """ Append the sample-dependent fields of one history object to another.
+def concatenate_history(history1, history2, samples1=-1, start1=None, verbose=False):
+    """Append the sample-dependent fields of one history object to another.
 
     Note:
         Samples data will be appended regardless of dish reboot or history
@@ -860,7 +860,9 @@ def concatenate_history(history1, history2, start=None, verbose=False):
             to append.
         history2: The grpc history object, such as one returned by a prior
             call to `get_history`, from which to append.
-        start (int): Optional starting counter value to be applied to the
+        samples1 (int): Optional number of samples to process, or -1 to parse
+            all available samples (bounded by start1, if it is set).
+        start1 (int): Optional starting counter value to be applied to the
             history1 data. See `history_bulk_data` documentation for more
             details on how this parameter is used.
         verbose (bool): Optionally produce verbose output.
@@ -889,7 +891,7 @@ def concatenate_history(history1, history2, start=None, verbose=False):
     unwrapped.unwrapped = True
 
     sample_range, ignore1, ignore2 = _compute_sample_range(  # pylint: disable=unused-variable
-        history1, len(history1.pop_ping_drop_rate), start=start)
+        history1, samples1, start=start1)
     for i in sample_range:
         for field in HISTORY_FIELDS:
             getattr(unwrapped, field).append(getattr(history1, field)[i])
