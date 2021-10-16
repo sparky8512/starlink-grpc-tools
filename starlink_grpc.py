@@ -34,9 +34,11 @@ This group holds information about the current state of the user terminal.
     on the user terminal.
 : **state** : As string describing the current connectivity state of the user
     terminal. One of: "UNKNOWN", "CONNECTED", "SEARCHING", "BOOTING".
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **uptime** : The amount of time, in seconds, since the user terminal last
     rebooted.
 : **snr** : Most recent sample value. See bulk history data for detail.
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **seconds_to_first_nonempty_slot** : Amount of time from now, in seconds,
     until a satellite will be scheduled to be available for transmit/receive.
     See also *scheduled* in the bulk history data. May report as a negative
@@ -162,13 +164,16 @@ representing the value over time, ending at the current time.
 : **uplink_throughput_bps** : Upload usage during the sample period, in bits
     per second.
 : **snr** : Signal to noise ratio during the sample period.
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **scheduled** : Boolean indicating whether or not a satellite was scheduled
     to be available for transmit/receive during the sample period.  When
     false, ping drop shows as "No satellites" in Starlink app.
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **obstructed** : Boolean indicating whether or not the user terminal
     determined the signal between it and the satellite was obstructed during
     the sample period. When true, ping drop shows as "Obstructed" in the
     Starlink app.
+    **OBSOLETE**: The user terminal no longer provides this data.
 
 There is no specific data field in the raw history data that directly
 correlates with "Other" or "Beta downtime" in the Starlink app (or whatever it
@@ -192,17 +197,29 @@ the field names of the Starlink gRPC service protocol) in various ways.
 : **count_obstructed** : The number of samples that were marked as
     "obstructed", regardless of whether they experienced any ping
     drop.
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 : **total_obstructed_ping_drop** : The total amount of time, in sample
     intervals, that experienced ping drop in samples marked as "obstructed".
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 : **count_full_obstructed_ping_drop** : The number of samples that were marked
     as "obstructed" and that experienced 100% ping drop.
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 : **count_unscheduled** : The number of samples that were not marked as
     "scheduled", regardless of whether they experienced any ping drop.
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 : **total_unscheduled_ping_drop** : The total amount of time, in sample
     intervals, that experienced ping drop in samples not marked as
     "scheduled".
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 : **count_full_unscheduled_ping_drop** : The number of samples that were not
     marked as "scheduled" and that experienced 100% ping drop.
+    **OBSOLETE**: The user terminal no longer provides the data from which
+    this was calculated.
 
 Total packet loss ratio can be computed with *total_ping_drop* / *samples*.
 
@@ -338,7 +355,7 @@ from spacex.api.device import device_pb2_grpc
 from spacex.api.device import dish_pb2
 
 HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
-                  "uplink_throughput_bps", "snr", "scheduled", "obstructed")
+                  "uplink_throughput_bps")
 
 
 def resolve_imports(channel):
@@ -601,9 +618,9 @@ def status_data(context=None):
         "id": status.device_info.id,
         "hardware_version": status.device_info.hardware_version,
         "software_version": status.device_info.software_version,
-        "state": dish_pb2.DishState.Name(status.state),
+        "state": "UNKNOWN",  # obsoleted in grpc service
         "uptime": status.device_state.uptime_s,
-        "snr": status.snr,
+        "snr": None,  # obsoleted in grpc service
         "seconds_to_first_nonempty_slot": status.seconds_to_first_nonempty_slot,
         "pop_ping_drop_rate": status.pop_ping_drop_rate,
         "downlink_throughput_bps": status.downlink_throughput_bps,
@@ -957,9 +974,6 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None, hi
     pop_ping_latency_ms = []
     downlink_throughput_bps = []
     uplink_throughput_bps = []
-    snr = []
-    scheduled = []
-    obstructed = []
 
     for i in sample_range:
         pop_ping_drop_rate.append(history.pop_ping_drop_rate[i])
@@ -967,9 +981,6 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None, hi
             history.pop_ping_latency_ms[i] if history.pop_ping_drop_rate[i] < 1 else None)
         downlink_throughput_bps.append(history.downlink_throughput_bps[i])
         uplink_throughput_bps.append(history.uplink_throughput_bps[i])
-        snr.append(history.snr[i])
-        scheduled.append(history.scheduled[i])
-        obstructed.append(history.obstructed[i])
 
     return {
         "samples": parsed_samples,
@@ -979,9 +990,9 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context=None, hi
         "pop_ping_latency_ms": pop_ping_latency_ms,
         "downlink_throughput_bps": downlink_throughput_bps,
         "uplink_throughput_bps": uplink_throughput_bps,
-        "snr": snr,
-        "scheduled": scheduled,
-        "obstructed": obstructed,
+        "snr": [None] * parsed_samples,  # obsoleted in grpc service
+        "scheduled": [None] * parsed_samples,  # obsoleted in grpc service
+        "obstructed": [None] * parsed_samples,  # obsoleted in grpc service
     }
 
 
@@ -1073,19 +1084,6 @@ def history_stats(parse_samples, start=None, verbose=False, context=None, histor
             run_length = 0
         elif init_run_length is None:
             init_run_length = 0
-        if not history.scheduled[i]:
-            count_unsched += 1
-            total_unsched_drop += d
-            if d >= 1:
-                count_full_unsched += 1
-        # scheduled=false and obstructed=true do not ever appear to overlap,
-        # but in case they do in the future, treat that as just unscheduled
-        # in order to avoid double-counting it.
-        elif history.obstructed[i]:
-            count_obstruct += 1
-            total_obstruct_drop += d
-            if d >= 1:
-                count_full_obstruct += 1
         tot += d
 
         down = history.downlink_throughput_bps[i]
