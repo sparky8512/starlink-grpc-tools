@@ -33,8 +33,8 @@ This group holds information about the current state of the user terminal.
 : **software_version** : A string identifying the software currently installed
     on the user terminal.
 : **state** : As string describing the current connectivity state of the user
-    terminal. One of: "UNKNOWN", "CONNECTED", "SEARCHING", "BOOTING".
-    **OBSOLETE**: The user terminal no longer provides this data.
+    terminal. One of: "UNKNOWN", "CONNECTED", "BOOTING", "SEARCHING", "STOWED",
+    "THERMAL_SHUTDOWN", "NO_SATS", "OBSTRUCTED", "NO_DOWNLINK", "NO_PINGS".
 : **uptime** : The amount of time, in seconds, since the user terminal last
     rebooted.
 : **snr** : Most recent sample value. See bulk history data for detail.
@@ -596,6 +596,15 @@ def status_data(context=None):
     except grpc.RpcError as e:
         raise GrpcError(e)
 
+    if status.HasField("outage"):
+        if status.outage.cause == dish_pb2.DishOutage.Cause.NO_SCHEDULE:
+            # Special case translate this to equivalent old name
+            state = "SEARCHING"
+        else:
+            state = dish_pb2.DishOutage.Cause.Name(status.outage.cause)
+    else:
+        state = "CONNECTED"
+
     # More alerts may be added in future, so in addition to listing them
     # individually, provide a bit field based on field numbers of the
     # DishAlerts message.
@@ -618,7 +627,7 @@ def status_data(context=None):
         "id": status.device_info.id,
         "hardware_version": status.device_info.hardware_version,
         "software_version": status.device_info.software_version,
-        "state": "UNKNOWN",  # obsoleted in grpc service
+        "state": state,
         "uptime": status.device_state.uptime_s,
         "snr": None,  # obsoleted in grpc service
         "seconds_to_first_nonempty_slot": status.seconds_to_first_nonempty_slot,
