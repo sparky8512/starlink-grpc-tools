@@ -3,7 +3,7 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
-name: Create and publish a Docker image
+name: Create and publish a Docker image to GitHub Packages Repository
 
 on: workflow_dispatch
 
