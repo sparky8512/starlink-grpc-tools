@@ -60,16 +60,13 @@ This group holds information about the current state of the user terminal.
 : **fraction_obstructed** : The fraction of total area (or possibly fraction
     of time?) that the user terminal has determined to be obstructed between
     it and the satellites with which it communicates.
-: **currently_obstructed** : Most recent sample value. See bulk history data
-    for detail.
+: **currently_obstructed** : Most recent sample value. See *obstructed* in
+    bulk history data for detail. This item still appears to be reported by
+    the user terminal despite no longer appearing in the bulk history data.
 : **seconds_obstructed** : The amount of time within the history buffer,
     in seconds, that the user terminal determined to be obstructed, regardless
-    of whether or not packets were able to be transmitted or received. See also
-    *count_obstructed* in general ping drop history data; this value will be
-    equal to that value when computed across all available history samples.
-    NOTE: The history buffer is now much smaller than it used to be, so this
-    field is probably either not very useful, or may be computed differently
-    by the user terminal than described above.
+    of whether or not packets were able to be transmitted or received.
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **obstruction_duration** : Average consecutive time, in seconds, the user
     terminal has detected its signal to be obstructed for a period of time
     that it considers "prolonged", or None if no such obstructions were
@@ -638,7 +635,7 @@ def status_data(context=None):
         "alerts": alert_bits,
         "fraction_obstructed": status.obstruction_stats.fraction_obstructed,
         "currently_obstructed": status.obstruction_stats.currently_obstructed,
-        "seconds_obstructed": status.obstruction_stats.last_24h_obstructed_s,
+        "seconds_obstructed": None,  # obsoleted in grpc service
         "obstruction_duration": obstruction_duration,
         "obstruction_interval": obstruction_interval,
         "direction_azimuth": status.boresight_azimuth_deg,
