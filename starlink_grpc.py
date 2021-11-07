@@ -351,6 +351,10 @@ from spacex.api.device import device_pb2
 from spacex.api.device import device_pb2_grpc
 from spacex.api.device import dish_pb2
 
+# Max wait time for gRPC request completion, in seconds. This is just to
+# prevent hang if the connection goes dead without closing.
+REQUEST_TIMEOUT = 10
+
 HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
                   "uplink_throughput_bps")
 
@@ -546,7 +550,7 @@ def get_status(context=None):
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
-        response = stub.Handle(device_pb2.Request(get_status={}))
+        response = stub.Handle(device_pb2.Request(get_status={}), timeout=REQUEST_TIMEOUT)
         return response.dish_get_status
 
     return call_with_channel(grpc_call, context=context)
@@ -816,7 +820,7 @@ def get_history(context=None):
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
-        response = stub.Handle(device_pb2.Request(get_history={}))
+        response = stub.Handle(device_pb2.Request(get_history={}), timeout=REQUEST_TIMEOUT)
         return response.dish_get_history
 
     return call_with_channel(grpc_call, context=context)
@@ -1209,7 +1213,8 @@ def get_obstruction_map(context=None):
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
-        response = stub.Handle(device_pb2.Request(dish_get_obstruction_map={}))
+        response = stub.Handle(device_pb2.Request(dish_get_obstruction_map={}),
+                               timeout=REQUEST_TIMEOUT)
         return response.dish_get_obstruction_map
 
     return call_with_channel(grpc_call, context=context)

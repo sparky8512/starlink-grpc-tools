@@ -11,7 +11,7 @@ from spacex.api.device import dish_pb2
 # call channel.close() when you're done with the gRPC connection.
 with grpc.insecure_channel("192.168.100.1:9200") as channel:
     stub = device_pb2_grpc.DeviceStub(channel)
-    response = stub.Handle(device_pb2.Request(get_status={}))
+    response = stub.Handle(device_pb2.Request(get_status={}), timeout=10)
 
 # Dump everything
 print(response)
