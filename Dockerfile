@@ -10,7 +10,7 @@ pip3 install \
     influxdb==5.3.1 python-dateutil==2.8.1 pytz==2021.1 requests==2.25.1 \
         certifi==2020.12.5 chardet==4.0.0 idna==2.10 urllib3==1.26.4 \
         six==1.15.0 msgpack==1.0.2 \
-    yagrc==1.1.0 grpcio-reflection==1.36.1 protobuf==3.15.6
+    yagrc==1.1.1 grpcio-reflection==1.36.1 protobuf==3.15.6
 
 ADD . /app
 WORKDIR /app
