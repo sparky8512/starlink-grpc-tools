@@ -192,9 +192,6 @@ def history_bulk_data(filename, parse_samples, verbose=False):
     pop_ping_latency_ms = []
     downlink_throughput_bps = []
     uplink_throughput_bps = []
-    snr = []
-    scheduled = []
-    obstructed = []
 
     for i in sample_range:
         pop_ping_drop_rate.append(history["popPingDropRate"][i])
@@ -202,9 +199,6 @@ def history_bulk_data(filename, parse_samples, verbose=False):
             history["popPingLatencyMs"][i] if history["popPingDropRate"][i] < 1 else None)
         downlink_throughput_bps.append(history["downlinkThroughputBps"][i])
         uplink_throughput_bps.append(history["uplinkThroughputBps"][i])
-        snr.append(history["snr"][i])
-        scheduled.append(history["scheduled"][i])
-        obstructed.append(history["obstructed"][i])
 
     return {
         "samples": parsed_samples,
@@ -214,9 +208,9 @@ def history_bulk_data(filename, parse_samples, verbose=False):
         "pop_ping_latency_ms": pop_ping_latency_ms,
         "downlink_throughput_bps": downlink_throughput_bps,
         "uplink_throughput_bps": uplink_throughput_bps,
-        "snr": snr,
-        "scheduled": scheduled,
-        "obstructed": obstructed,
+        "snr": [None] * parsed_samples,  # obsoleted in grpc service
+        "scheduled": [None] * parsed_samples,  # obsoleted in grpc service
+        "obstructed": [None] * parsed_samples,  # obsoleted in grpc service
     }
 
 
@@ -299,19 +293,6 @@ def history_stats(filename, parse_samples, verbose=False):
             run_length = 0
         elif init_run_length is None:
             init_run_length = 0
-        if not history["scheduled"][i]:
-            count_unsched += 1
-            total_unsched_drop += d
-            if d >= 1:
-                count_full_unsched += 1
-        # scheduled=false and obstructed=true do not ever appear to overlap,
-        # but in case they do in the future, treat that as just unscheduled
-        # in order to avoid double-counting it.
-        elif history["obstructed"][i]:
-            count_obstruct += 1
-            total_obstruct_drop += d
-            if d >= 1:
-                count_full_obstruct += 1
         tot += d
 
         down = history["downlinkThroughputBps"][i]
