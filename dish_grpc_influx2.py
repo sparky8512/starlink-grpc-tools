@@ -249,9 +249,9 @@ def loop_body(opts, gstate):
             # save off counter value for script restart
             points[-1]["fields"]["counter"] = counter + count
 
-    #now = time.time()
+    now = time.time()
     # work with UTC here
-    now = time.mktime(datetime.utcnow().timetuple())
+    # now = time.mktime(datetime.utcnow().timetuple())
     rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence, add_bulk=cb_add_bulk)
     if rc:
         return rc
