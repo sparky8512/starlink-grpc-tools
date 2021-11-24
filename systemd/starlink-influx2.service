@@ -5,5 +5,5 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/starlink-grpc-tools/
-Environment=INFLUXDB_URL=localhost:8086 INFLUXDB_TOKEN=<changeme> INFLUXDB_Bucket=<changeme> INFLUXDB_ORG=<changeme> INFLUXDB_SSL=false
-ExecStart=python3 dish_grpc_influx2.py -B starlink -t status alert_detail
+Environment=INFLUXDB_URL=http://localhost:8086 INFLUXDB_TOKEN=<changeme> INFLUXDB_Bucket=<changeme> INFLUXDB_ORG=<changeme> INFLUXDB_SSL=false
+ExecStart=/opt/starlink-grpc-tools/venv/python3 dish_grpc_influx2.py -B starlink -t 10 status alert_detail
