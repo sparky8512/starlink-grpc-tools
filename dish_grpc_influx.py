@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Write Starlink user terminal data to an InfluxDB database.
+"""Write Starlink user terminal data to an InfluxDB 1.x database.
 
 This script pulls the current status info and/or metrics computed from the
 history data and writes them to the specified InfluxDB database either once
@@ -51,15 +51,15 @@ def handle_sigterm(signum, frame):
 
 
 def parse_args():
-    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB database")
+    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB 1.x database")
 
-    group = parser.add_argument_group(title="InfluxDB database options")
+    group = parser.add_argument_group(title="InfluxDB 1.x database options")
     group.add_argument("-n",
                        "--hostname",
                        default=HOST_DEFAULT,
                        dest="host",
-                       help="Hostname of MQTT broker, default: " + HOST_DEFAULT)
-    group.add_argument("-p", "--port", type=int, help="Port number to use on MQTT broker")
+                       help="Hostname of InfluxDB server, default: " + HOST_DEFAULT)
+    group.add_argument("-p", "--port", type=int, help="Port number to use on InfluxDB server")
     group.add_argument("-P", "--password", help="Set password for username/password authentication")
     group.add_argument("-U", "--username", help="Set username for authentication")
     group.add_argument("-D",
@@ -74,7 +74,7 @@ def parse_args():
     group.add_argument("-C",
                        "--ca-cert",
                        dest="verify_ssl",
-                       help="Enable SSL/TLS using specified CA cert to verify broker",
+                       help="Enable SSL/TLS using specified CA cert to verify server",
                        metavar="FILENAME")
     group.add_argument("-I",
                        "--insecure",
