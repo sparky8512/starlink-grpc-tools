@@ -1,0 +1,12 @@
+[Unit]
+Description=Starlink GRPC to InfluxDB 2.x exporter
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/starlink-grpc-tools/
+Environment=INFLUXDB_URL=http://localhost:8086 INFLUXDB_TOKEN=<changeme> INFLUXDB_Bucket=<changeme> INFLUXDB_ORG=<changeme> INFLUXDB_SSL=false
+ExecStart=/opt/starlink-grpc-tools/venv/bin/python3 dish_grpc_influx2.py -t 10 status alert_detail
+
+[Install]
+WantedBy=multi-user.target

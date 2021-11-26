@@ -20,10 +20,6 @@ pip install --upgrade -r requirements.txt
 
 If you really care about the details here or wish to minimize your package requirements, you can find more detail about which specific modules are required for what usage in [this Wiki article](https://github.com/sparky8512/starlink-grpc-tools/wiki/Python-Module-Dependencies).
 
-### InfluxDB 2.x
-
-The script that records data to InfluxDB uses the (slightly) older version of the InfluxDB client Python module, not the InfluxDB 2.x client. It can still be made to work with an InfluxDB 2.0 server (and probably later 2.x versions), but doing so requires using `influx v1` [CLI commands](https://docs.influxdata.com/influxdb/v2.0/reference/cli/influx/v1/) on the server to map the 1.x username, password, and database names to their 2.x equivalents.
-
 ### Generating the gRPC protocol modules (for non-Docker usage)
 
 This step is no longer required, nor is it particularly recommended, so the details have been moved to [this Wiki article](https://github.com/sparky8512/starlink-grpc-tools/wiki/gRPC-Protocol-Modules).
@@ -150,6 +146,28 @@ docker run -d -t --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostnam
 The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
 
 If there is some problem with accessing the image from the GitHub Packages repository, there is also an image available on Docker Hub, which can be accessed as `neurocis/starlink-grpc-tools`, but note that that image may not be as up to date with changes as the supported one.
+
+## Running with SystemD
+
+To run e.g. the `dish_grpc_influx2` script via SystemD the following steps are an option.
+Commands here should work for debian / ubuntu based distribution
+
+```shell
+sudo apt instlall python3-venv
+cd /opt/
+sudo mkdir starlink-grpc-tool
+sudo chown <your non-root user>
+git clone <git url>
+cd starlink-grpc-tool
+python3 -m venv venv
+source venv/bin/activate.sh
+pip3 install -r requrements.txt
+sudo cp systemd/starlink-influx2.service /etc/systemd/starlink-influx2.service
+sudo <your favorite editor> /etc/systemd/system/starlink-influx2.service
+# Set influx url, token, bucket and org
+sudo systemctl enable starlink-influx2
+sudo systemctl start starlink-influx2
+```
 
 ## Dashboards
 
