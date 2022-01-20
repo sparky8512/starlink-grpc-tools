@@ -104,6 +104,8 @@ python3 poll_history.py
 ```
 Possibly more simple examples to come, as the other scripts have started getting a bit complicated.
 
+`extract_protoset.py` can be used in place of `grpcurl` for recording the dish protocol information. See [the related Wiki article](https://github.com/sparky8512/starlink-grpc-tools/wiki/gRPC-Protocol-Modules) for more details.
+
 ## Running with Docker
 
 The supported docker image for this project is now the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools/versions).
