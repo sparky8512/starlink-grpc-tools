@@ -168,7 +168,7 @@ class GlobalState:
         self.context.close()
 
 
-def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
+def get_data(opts, gstate, add_item, add_sequence, add_bulk=None, flush_history=False):
     """Fetch data from the dish, pull it apart and call back with the pieces.
 
     This function uses call backs to return the useful data. If need_id is set
@@ -189,16 +189,27 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None):
             prototype:
 
             add_bulk(bulk_data, count, start_timestamp, start_counter)
+        flush_history (bool): Optional. If true, run in a special mode that
+            emits (only) history stats for already polled data, if any,
+            regardless of --poll-loops state. Intended for script shutdown
+            operation, in order to flush stats for polled history data which
+            would otherwise be lost on script restart.
 
     Returns:
         1 if there were any failures getting data from the dish, otherwise 0.
     """
-    rc = get_status_data(opts, gstate, add_item, add_sequence)
+    if flush_history and opts.poll_loops < 2:
+        return 0
+
+    rc = 0
+
+    if not flush_history:
+        rc = get_status_data(opts, gstate, add_item, add_sequence)
 
     if opts.history_stats_mode and not rc:
-        rc = get_history_stats(opts, gstate, add_item, add_sequence)
+        rc = get_history_stats(opts, gstate, add_item, add_sequence, flush_history)
 
-    if opts.bulk_mode and add_bulk and not rc:
+    if not flush_history and opts.bulk_mode and add_bulk and not rc:
         rc = get_bulk_data(opts, gstate, add_bulk)
 
     return rc
@@ -263,13 +274,16 @@ def get_status_data(opts, gstate, add_item, add_sequence):
     return 0
 
 
-def get_history_stats(opts, gstate, add_item, add_sequence):
+def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
     """Fetch history stats.  See `get_data` for details."""
-    try:
-        history = starlink_grpc.get_history(context=gstate.context)
-    except grpc.RpcError as e:
-        conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
+    if flush_history:
         history = None
+    else:
+        try:
+            history = starlink_grpc.get_history(context=gstate.context)
+        except grpc.RpcError as e:
+            conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
+            history = None
 
     parse_samples = opts.samples if gstate.counter_stats is None else -1
     start = gstate.counter_stats if gstate.counter_stats else None
@@ -293,14 +307,14 @@ def get_history_stats(opts, gstate, add_item, add_sequence):
     else:
         gstate.accum_history = history
 
-    if gstate.poll_count < opts.poll_loops - 1:
+    if gstate.poll_count < opts.poll_loops - 1 and not flush_history:
         gstate.poll_count += 1
         return 0
 
     # This can happen if all polling attempts failed. Verbose output has
     # already happened, so just return.
     if gstate.accum_history is None:
-        return 1
+        return 0 if flush_history else 1
 
     gstate.poll_count = 0
 

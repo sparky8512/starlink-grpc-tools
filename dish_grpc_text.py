@@ -13,6 +13,7 @@ the alert_detail mode, you can use the alerts bitmask in the status group.
 
 from datetime import datetime
 import logging
+import signal
 import sys
 import time
 
@@ -55,6 +56,15 @@ VERBOSE_FIELD_MAP = {
     "download_usage": "Bytes downloaded",
     "upload_usage": "Bytes uploaded",
 }
+
+
+class Terminated(Exception):
+    pass
+
+
+def handle_sigterm(signum, frame):
+    # Turn SIGTERM into an exception so main loop can clean up
+    raise Terminated
 
 
 def parse_args():
@@ -127,7 +137,7 @@ def print_header(opts):
     return 0
 
 
-def loop_body(opts, gstate):
+def loop_body(opts, gstate, shutdown=False):
     if opts.verbose:
         csv_data = []
     else:
@@ -175,7 +185,8 @@ def loop_body(opts, gstate):
                               gstate,
                               cb_data_add_item,
                               cb_data_add_sequence,
-                              add_bulk=cb_add_bulk)
+                              add_bulk=cb_add_bulk,
+                              flush_history=shutdown)
 
     if opts.verbose:
         if csv_data:
@@ -200,6 +211,7 @@ def main():
         sys.exit(rc)
 
     gstate = dish_common.GlobalState(target=opts.target)
+    signal.signal(signal.SIGTERM, handle_sigterm)
 
     try:
         next_loop = time.monotonic()
@@ -211,7 +223,10 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
+    except Terminated:
+        pass
     finally:
+        loop_body(opts, gstate, shutdown=True)
         gstate.shutdown()
 
     sys.exit(rc)

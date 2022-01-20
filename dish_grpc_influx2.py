@@ -220,7 +220,7 @@ def sync_timebase(opts, gstate):
     gstate.deferred_points.clear()
 
 
-def loop_body(opts, gstate):
+def loop_body(opts, gstate, shutdown=False):
     fields = {"status": {}, "ping_stats": {}, "usage": {}}
 
     def cb_add_item(key, val, category):
@@ -252,7 +252,12 @@ def loop_body(opts, gstate):
     now = time.time()
     # work with UTC here
     # now = time.mktime(datetime.utcnow().timetuple())
-    rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence, add_bulk=cb_add_bulk)
+    rc = dish_common.get_data(opts,
+                              gstate,
+                              cb_add_item,
+                              cb_add_sequence,
+                              add_bulk=cb_add_bulk,
+                              flush_history=shutdown)
     if rc:
         return rc
 
@@ -318,6 +323,7 @@ def main():
     except Terminated:
         pass
     finally:
+        loop_body(opts, gstate, shutdown=True)
         if gstate.points:
             rc = flush_points(opts, gstate)
         gstate.influx_client.close()

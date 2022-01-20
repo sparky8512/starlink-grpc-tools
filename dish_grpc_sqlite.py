@@ -72,7 +72,7 @@ def parse_args():
     group.add_argument("-k",
                        "--skip-query",
                        action="store_true",
-                       help="Skip querying for prior sample write point in bulk mode")
+                       help="Skip querying for prior sample write point in history modes")
 
     opts = dish_common.run_arg_parser(parser, need_id=True)
 
@@ -99,7 +99,7 @@ def query_counter(opts, gstate, column, table):
         return 0, None
 
 
-def loop_body(opts, gstate):
+def loop_body(opts, gstate, shutdown=False):
     tables = {"status": {}, "ping_stats": {}, "usage": {}}
     hist_cols = ["time", "id"]
     hist_rows = []
@@ -123,14 +123,17 @@ def loop_body(opts, gstate):
             hist_rows.append(row)
 
     now = int(time.time())
-    rc = dish_common.get_status_data(opts, gstate, cb_add_item, cb_add_sequence)
+    rc = 0
+
+    if not shutdown:
+        rc = dish_common.get_status_data(opts, gstate, cb_add_item, cb_add_sequence)
 
     if opts.history_stats_mode and not rc:
         if gstate.counter_stats is None and not opts.skip_query and opts.samples < 0:
             _, gstate.counter_stats = query_counter(opts, gstate, "end_counter", "ping_stats")
-        rc = dish_common.get_history_stats(opts, gstate, cb_add_item, cb_add_sequence)
+        rc = dish_common.get_history_stats(opts, gstate, cb_add_item, cb_add_sequence, shutdown)
 
-    if opts.bulk_mode and not rc:
+    if not shutdown and opts.bulk_mode and not rc:
         if gstate.counter is None and not opts.skip_query and opts.bulk_samples < 0:
             gstate.timestamp, gstate.counter = query_counter(opts, gstate, "counter", "history")
         rc = dish_common.get_bulk_data(opts, gstate, cb_add_bulk)
@@ -298,6 +301,7 @@ def main():
     except Terminated:
         pass
     finally:
+        loop_body(opts, gstate, shutdown=True)
         gstate.sql_conn.close()
         gstate.shutdown()
 
