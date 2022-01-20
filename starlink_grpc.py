@@ -129,8 +129,9 @@ their nature, but the field names are pretty self-explanatory.
     in *alerts*.
 : **alert_mast_not_near_vertical** : Alert corresponding with bit 4 (bit mask
     16) in *alerts*.
-: **slow_ethernet_speeds** : Alert corresponding with bit 5 (bit mask 32) in
-    *alerts*.
+: **alert_slow_ethernet_speeds** : Alert corresponding with bit 5 (bit mask
+    32) in *alerts*.
+: **alert_roaming** : Alert corresponding with bit 6 (bit mask 64) in *alerts*.
 
 General history data
 --------------------
