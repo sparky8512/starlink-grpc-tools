@@ -132,6 +132,9 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
         opts.samples = int(opts.loop_interval) if opts.loop_interval >= 1.0 else -1
         opts.bulk_samples = -1
     else:
+        # for scripts that query starting history counter, skip it if samples
+        # was explicitly set
+        opts.skip_query = True
         opts.bulk_samples = opts.samples
 
     opts.no_stdout_errors = no_stdout_errors
@@ -153,15 +156,17 @@ def conn_error(opts, msg, *args):
 class GlobalState:
     """A class for keeping state across loop iterations."""
     def __init__(self, target=None):
-        # counter for bulk_history:
+        # counter, timestamp for bulk_history:
         self.counter = None
-        # counter for history stats:
-        self.counter_stats = None
         self.timestamp = None
+        # counter, timestamp for history stats:
+        self.counter_stats = None
+        self.timestamp_stats = None
         self.dish_id = None
         self.context = starlink_grpc.ChannelContext(target=target)
         self.poll_count = 0
         self.accum_history = None
+        self.first_poll = True
 
     def shutdown(self):
         self.context.close()
@@ -195,23 +200,32 @@ def get_data(opts, gstate, add_item, add_sequence, add_bulk=None, flush_history=
             would otherwise be lost on script restart.
 
     Returns:
-        1 if there were any failures getting data from the dish, otherwise 0.
+        Tuple with 3 values. The first value is 1 if there were any failures
+        getting data from the dish, otherwise 0. The second value is an int
+        timestamp for status data (data with category "status"), or None if
+        no status data was reported. The third value is an int timestamp for
+        history stats data (non-bulk data with category other than "status"),
+        or None if no history stats data was reported.
     """
     if flush_history and opts.poll_loops < 2:
-        return 0
+        return 0, None, None
 
     rc = 0
+    status_ts = None
+    hist_ts = None
 
     if not flush_history:
-        rc = get_status_data(opts, gstate, add_item, add_sequence)
+        rc, status_ts = get_status_data(opts, gstate, add_item, add_sequence)
 
-    if opts.history_stats_mode and not rc:
-        rc = get_history_stats(opts, gstate, add_item, add_sequence, flush_history)
+    if opts.history_stats_mode and (not rc or opts.poll_loops > 1):
+        hist_rc, hist_ts = get_history_stats(opts, gstate, add_item, add_sequence, flush_history)
+        if not rc:
+            rc = hist_rc
 
     if not flush_history and opts.bulk_mode and add_bulk and not rc:
         rc = get_bulk_data(opts, gstate, add_bulk)
 
-    return rc
+    return rc, status_ts, hist_ts
 
 
 def add_data_normal(data, category, add_item, add_sequence):
@@ -237,6 +251,7 @@ def add_data_numeric(data, category, add_item, add_sequence):
 
 def get_status_data(opts, gstate, add_item, add_sequence):
     if opts.satus_mode:
+        timestamp = int(time.time())
         try:
             groups = starlink_grpc.status_data(context=gstate.context)
             status_data, obstruct_detail, alert_detail = groups[0:3]
@@ -244,13 +259,13 @@ def get_status_data(opts, gstate, add_item, add_sequence):
             if "status" in opts.mode:
                 if opts.need_id and gstate.dish_id is None:
                     conn_error(opts, "Dish unreachable and ID unknown, so not recording state")
-                    return 1
+                    return 1, None
                 if opts.verbose:
                     print("Dish unreachable")
                 add_item("state", "DISH_UNREACHABLE", "status")
-                return 0
+                return 0, timestamp
             conn_error(opts, "Failure getting status: %s", str(e))
-            return 1
+            return 1, None
         if opts.need_id:
             gstate.dish_id = status_data["id"]
             del status_data["id"]
@@ -261,25 +276,28 @@ def get_status_data(opts, gstate, add_item, add_sequence):
             add_data(obstruct_detail, "status", add_item, add_sequence)
         if "alert_detail" in opts.mode:
             add_data(alert_detail, "status", add_item, add_sequence)
+        return 0, timestamp
     elif opts.need_id and gstate.dish_id is None:
         try:
             gstate.dish_id = starlink_grpc.get_id(context=gstate.context)
         except starlink_grpc.GrpcError as e:
             conn_error(opts, "Failure getting dish ID: %s", str(e))
-            return 1
+            return 1, None
         if opts.verbose:
             print("Using dish ID: " + gstate.dish_id)
 
-    return 0
+    return 0, None
 
 
 def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
     """Fetch history stats.  See `get_data` for details."""
-    if flush_history:
+    if flush_history or (opts.need_id and gstate.dish_id is None):
         history = None
     else:
         try:
+            timestamp = int(time.time())
             history = starlink_grpc.get_history(context=gstate.context)
+            gstate.timestamp_stats = timestamp
         except grpc.RpcError as e:
             conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
             history = None
@@ -306,16 +324,27 @@ def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
     else:
         gstate.accum_history = history
 
+    # When resuming from prior count with --poll-loops set, advance the loop
+    # count by however many loops worth of data was caught up on. This helps
+    # avoid abnormally large sample counts in the first set of output data.
+    if gstate.first_poll and gstate.accum_history:
+        if opts.poll_loops > 1 and gstate.counter_stats:
+            new_samples = gstate.accum_history.current - gstate.counter_stats
+            if new_samples < 0:
+                new_samples = gstate.accum_history.current
+            if new_samples > len(gstate.accum_history.pop_ping_drop_rate):
+                new_samples = len(gstate.accum_history.pop_ping_drop_rate)
+            gstate.poll_count = max(gstate.poll_count, int((new_samples-1) / opts.loop_interval))
+        gstate.first_poll = False
+
     if gstate.poll_count < opts.poll_loops - 1 and not flush_history:
         gstate.poll_count += 1
-        return 0
-
-    # This can happen if all polling attempts failed. Verbose output has
-    # already happened, so just return.
-    if gstate.accum_history is None:
-        return 0 if flush_history else 1
+        return 0, None
 
     gstate.poll_count = 0
+
+    if gstate.accum_history is None:
+        return (0, None) if flush_history else (1, None)
 
     groups = starlink_grpc.history_stats(parse_samples,
                                          start=start,
@@ -337,9 +366,11 @@ def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
     if not opts.no_counter:
         gstate.counter_stats = general["end_counter"]
 
+    timestamp = gstate.timestamp_stats
+    gstate.timestamp_stats = None
     gstate.accum_history = None
 
-    return 0
+    return 0, timestamp
 
 
 def get_bulk_data(opts, gstate, add_bulk):

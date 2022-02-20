@@ -51,7 +51,8 @@ def handle_sigterm(signum, frame):
 
 
 def parse_args():
-    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB 1.x database")
+    parser = dish_common.create_arg_parser(
+        output_description="write it to an InfluxDB 1.x database")
 
     group = parser.add_argument_group(title="InfluxDB 1.x database options")
     group.add_argument("-n",
@@ -250,24 +251,24 @@ def loop_body(opts, gstate, shutdown=False):
             # save off counter value for script restart
             points[-1]["fields"]["counter"] = counter + count
 
-    now = time.time()
-    rc = dish_common.get_data(opts,
-                              gstate,
-                              cb_add_item,
-                              cb_add_sequence,
-                              add_bulk=cb_add_bulk,
-                              flush_history=shutdown)
+    rc, status_ts, hist_ts = dish_common.get_data(opts,
+                                                  gstate,
+                                                  cb_add_item,
+                                                  cb_add_sequence,
+                                                  add_bulk=cb_add_bulk,
+                                                  flush_history=shutdown)
     if rc:
         return rc
 
     for category in fields:
         if fields[category]:
+            timestamp = status_ts if category == "status" else hist_ts
             gstate.points.append({
                 "measurement": "spacex.starlink.user_terminal." + category,
                 "tags": {
                     "id": gstate.dish_id
                 },
-                "time": int(now),
+                "time": timestamp,
                 "fields": fields[category],
             })
 

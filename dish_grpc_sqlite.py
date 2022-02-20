@@ -122,16 +122,20 @@ def loop_body(opts, gstate, shutdown=False):
             row.append(counter)
             hist_rows.append(row)
 
-    now = int(time.time())
     rc = 0
+    status_ts = None
+    hist_ts = None
 
     if not shutdown:
-        rc = dish_common.get_status_data(opts, gstate, cb_add_item, cb_add_sequence)
+        rc, status_ts = dish_common.get_status_data(opts, gstate, cb_add_item, cb_add_sequence)
 
-    if opts.history_stats_mode and not rc:
+    if opts.history_stats_mode and (not rc or opts.poll_loops > 1):
         if gstate.counter_stats is None and not opts.skip_query and opts.samples < 0:
             _, gstate.counter_stats = query_counter(opts, gstate, "end_counter", "ping_stats")
-        rc = dish_common.get_history_stats(opts, gstate, cb_add_item, cb_add_sequence, shutdown)
+        hist_rc, hist_ts = dish_common.get_history_stats(opts, gstate, cb_add_item, cb_add_sequence,
+                                                         shutdown)
+        if not rc:
+            rc = hist_rc
 
     if not shutdown and opts.bulk_mode and not rc:
         if gstate.counter is None and not opts.skip_query and opts.bulk_samples < 0:
@@ -144,11 +148,12 @@ def loop_body(opts, gstate, shutdown=False):
         cur = gstate.sql_conn.cursor()
         for category, fields in tables.items():
             if fields:
+                timestamp = status_ts if category == "status" else hist_ts
                 sql = 'INSERT OR REPLACE INTO "{0}" ("time","id",{1}) VALUES ({2})'.format(
                     category, ",".join('"' + x + '"' for x in fields),
                     ",".join(repeat("?",
                                     len(fields) + 2)))
-                values = [now, gstate.dish_id]
+                values = [timestamp, gstate.dish_id]
                 values.extend(fields.values())
                 cur.execute(sql, values)
                 rows_written += 1

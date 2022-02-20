@@ -93,6 +93,13 @@ def parse_args():
     if (opts.history_stats_mode or opts.satus_mode) and opts.bulk_mode and not opts.verbose:
         parser.error("bulk_history cannot be combined with other modes for CSV output")
 
+    # Technically possible, but a pain to implement, so just disallow it. User
+    # probably doesn't realize how weird it would be, anyway, given that stats
+    # data reports at a different rate from status data in this case.
+    if opts.history_stats_mode and opts.satus_mode and not opts.verbose and opts.poll_loops > 1:
+        parser.error("usage of --poll-loops with history stats modes cannot be mixed with status "
+                     "modes for CSV output")
+
     opts.skip_query |= opts.no_counter | opts.verbose
     if opts.out_file == "-":
         opts.no_stdout_errors = True
@@ -179,10 +186,7 @@ def get_prior_counter(opts, gstate):
 
 
 def loop_body(opts, gstate, print_file, shutdown=False):
-    if opts.verbose:
-        csv_data = []
-    else:
-        csv_data = [datetime.utcnow().replace(microsecond=0).isoformat()]
+    csv_data = []
 
     def xform(val):
         return "" if val is None else str(val)
@@ -224,12 +228,12 @@ def loop_body(opts, gstate, print_file, shutdown=False):
                 fields.extend([xform(val[i]) for val in bulk.values()])
                 print(",".join(fields), file=print_file)
 
-    rc = dish_common.get_data(opts,
-                              gstate,
-                              cb_data_add_item,
-                              cb_data_add_sequence,
-                              add_bulk=cb_add_bulk,
-                              flush_history=shutdown)
+    rc, status_ts, hist_ts = dish_common.get_data(opts,
+                                                  gstate,
+                                                  cb_data_add_item,
+                                                  cb_data_add_sequence,
+                                                  add_bulk=cb_add_bulk,
+                                                  flush_history=shutdown)
 
     if opts.verbose:
         if csv_data:
@@ -237,8 +241,9 @@ def loop_body(opts, gstate, print_file, shutdown=False):
             if opts.loop_interval > 0.0:
                 print(file=print_file)
     else:
-        # skip if only timestamp
-        if len(csv_data) > 1:
+        if csv_data:
+            timestamp = status_ts if status_ts is not None else hist_ts
+            csv_data.insert(0, datetime.utcfromtimestamp(timestamp).isoformat())
             print(",".join(csv_data), file=print_file)
 
     return rc

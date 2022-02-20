@@ -100,7 +100,7 @@ def loop_body(opts, gstate):
             ("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
                                                 key), ",".join(str(x) for x in val), 0, False))
 
-    rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)
+    rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)[0]
 
     if msgs:
         try:
