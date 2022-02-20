@@ -22,7 +22,6 @@ import grpc
 import starlink_grpc
 
 BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
-SAMPLES_DEFAULT = 3600
 LOOP_TIME_DEFAULT = 0
 STATUS_MODES = ["status", "obstruction_detail", "alert_detail"]
 HISTORY_STATS_MODES = [
@@ -79,13 +78,13 @@ def create_arg_parser(output_description, bulk_history=True):
     if bulk_history:
         sample_help = ("Number of data samples to parse; normally applies to first loop "
                        "iteration only, default: all in bulk mode, loop interval if loop "
-                       "interval set, else " + str(SAMPLES_DEFAULT))
+                       "interval set, else all available samples")
         no_counter_help = ("Don't track sample counter across loop iterations in non-bulk "
                            "modes; keep using samples option value instead")
     else:
         sample_help = ("Number of data samples to parse; normally applies to first loop "
-                       "iteration only, default: loop interval, if set, else " +
-                       str(SAMPLES_DEFAULT))
+                       "iteration only, default: loop interval, if set, else all available " +
+                       "samples")
         no_counter_help = ("Don't track sample counter across loop iterations; keep using "
                            "samples option value instead")
     group.add_argument("-s", "--samples", type=int, help=sample_help)
@@ -130,7 +129,7 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
     opts.bulk_mode = "bulk_history" in opts.mode
 
     if opts.samples is None:
-        opts.samples = int(opts.loop_interval) if opts.loop_interval >= 1.0 else SAMPLES_DEFAULT
+        opts.samples = int(opts.loop_interval) if opts.loop_interval >= 1.0 else -1
         opts.bulk_samples = -1
     else:
         opts.bulk_samples = opts.samples
