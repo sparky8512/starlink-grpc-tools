@@ -17,6 +17,8 @@ Where *id_value* is the *id* value from the dish status information.
 import logging
 import sys
 import time
+import json
+
 
 try:
     import ssl
@@ -43,6 +45,7 @@ def parse_args():
     group.add_argument("-p", "--port", type=int, help="Port number to use on MQTT broker")
     group.add_argument("-P", "--password", help="Set password for username/password authentication")
     group.add_argument("-U", "--username", help="Set username for authentication")
+    group.add_argument("-J", "--json", action="store_true", help="Publish data as JSON")
     if ssl_ok:
 
         def wrap_ca_arg(arg):
@@ -91,16 +94,37 @@ def parse_args():
 def loop_body(opts, gstate):
     msgs = []
 
-    def cb_add_item(key, val, category):
-        msgs.append(("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
-                                                        key), val, 0, False))
+    if opts.json:
 
-    def cb_add_sequence(key, val, category, _):
-        msgs.append(
-            ("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
-                                                key), ",".join(str(x) for x in val), 0, False))
+        data = {}
+
+        def cb_add_item(key, val, category):
+            if not "dish_{0}".format(category) in data:
+                data["dish_{0}".format(category)] = {}
+
+            data["dish_{0}".format(category)].update({key: val})
+
+
+        def cb_add_sequence(key, val, category, _):
+            if not "dish_{0}".format(category) in data:
+                data["dish_{0}".format(category)] = {}
+
+            data["dish_{0}".format(category)].update({key: list(val)})
+
+    else:
+        def cb_add_item(key, val, category):
+            msgs.append(("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
+                                                            key), val, 0, False))
+
+        def cb_add_sequence(key, val, category, _):
+            msgs.append(
+                ("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
+                                                    key), ",".join(str(x) for x in val), 0, False))
 
     rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)[0]
+
+    if opts.json:
+        msgs.append(("starlink/{0}".format(gstate.dish_id), json.dumps(data), 0, False))
 
     if msgs:
         try:
