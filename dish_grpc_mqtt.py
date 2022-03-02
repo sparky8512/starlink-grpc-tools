@@ -20,6 +20,7 @@ import signal
 import sys
 import time
 import json
+import math
 
 
 try:
@@ -135,7 +136,9 @@ def loop_body(opts, gstate):
             if not "dish_{0}".format(category) in data:
                 data["dish_{0}".format(category)] = {}
 
-            data["dish_{0}".format(category)].update({key: val})
+            # Skip NaN values that occur on startup because they can upset Javascript JSON parsers
+            if not ((type(val) == float) and math.isnan(val)):
+                data["dish_{0}".format(category)].update({key: val})
 
 
         def cb_add_sequence(key, val, category, _):
