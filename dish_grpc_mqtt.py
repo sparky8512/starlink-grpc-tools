@@ -12,6 +12,11 @@ Data will be published to the following topic names:
 : starlink/dish_usage/*id_value*/*field_name* : Usage history statistics
 
 Where *id_value* is the *id* value from the dish status information.
+
+Unless the --json command line option is used, in which case, JSON-formatted
+data will be published to topic name:
+
+: starlink/*id_value*
 """
 
 import json
