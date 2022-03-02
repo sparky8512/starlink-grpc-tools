@@ -14,14 +14,13 @@ Data will be published to the following topic names:
 Where *id_value* is the *id* value from the dish status information.
 """
 
+import json
 import logging
+import math
 import os
 import signal
 import sys
 import time
-import json
-import math
-
 
 try:
     import ssl
@@ -34,6 +33,7 @@ import paho.mqtt.publish
 import dish_common
 
 HOST_DEFAULT = "localhost"
+
 
 class Terminated(Exception):
     pass
@@ -96,12 +96,13 @@ def parse_args():
         val = os.environ.get(var)
         if val:
             if var == "MQTT_SSL":
-                if val == "insecure":
-                    env_defaults[opt] = False
-                elif val == "secure":
-                    env_defaults[opt] = True
-                else:
-                    env_defaults["ssl_ca_cert"] = val
+                if ssl_ok and val != "false":
+                    if val == "insecure":
+                        env_defaults[opt] = {"cert_reqs": ssl.CERT_NONE}
+                    elif val == "secure":
+                        env_defaults[opt] = {}
+                    else:
+                        env_defaults[opt] = {"ca_certs": val}
             else:
                 env_defaults[opt] = val
     parser.set_defaults(**env_defaults)
@@ -140,7 +141,6 @@ def loop_body(opts, gstate):
             if not ((type(val) == float) and math.isnan(val)):
                 data["dish_{0}".format(category)].update({key: val})
 
-
         def cb_add_sequence(key, val, category, _):
             if not "dish_{0}".format(category) in data:
                 data["dish_{0}".format(category)] = {}
@@ -148,6 +148,7 @@ def loop_body(opts, gstate):
             data["dish_{0}".format(category)].update({key: list(val)})
 
     else:
+
         def cb_add_item(key, val, category):
             msgs.append(("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
                                                             key), val, 0, False))
