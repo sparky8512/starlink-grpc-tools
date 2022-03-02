@@ -154,9 +154,8 @@ def loop_body(opts, gstate):
                                                             key), val, 0, False))
 
         def cb_add_sequence(key, val, category, _):
-            msgs.append(
-                ("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id,
-                                                    key), ",".join(str(x) for x in val), 0, False))
+            msgs.append(("starlink/dish_{0}/{1}/{2}".format(category, gstate.dish_id, key),
+                         ",".join("" if x is None else str(x) for x in val), 0, False))
 
     rc = dish_common.get_data(opts, gstate, cb_add_item, cb_add_sequence)[0]
 
