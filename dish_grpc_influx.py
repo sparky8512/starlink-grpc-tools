@@ -311,6 +311,7 @@ def main():
         # ...unless influxdb-python package version is too old
         gstate.influx_client = InfluxDBClient(**opts.icargs)
 
+    rc = 0
     try:
         next_loop = time.monotonic()
         while True:
@@ -321,7 +322,7 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
-    except Terminated:
+    except (KeyboardInterrupt, Terminated):
         pass
     finally:
         loop_body(opts, gstate, shutdown=True)

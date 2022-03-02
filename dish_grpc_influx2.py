@@ -307,7 +307,7 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
-    except Terminated:
+    except (KeyboardInterrupt, Terminated):
         pass
     finally:
         loop_body(opts, gstate, shutdown=True)

@@ -274,6 +274,7 @@ def main():
         sys.exit(1)
     signal.signal(signal.SIGTERM, handle_sigterm)
 
+    rc = 0
     try:
         next_loop = time.monotonic()
         while True:
@@ -284,7 +285,7 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
-    except Terminated:
+    except (KeyboardInterrupt, Terminated):
         pass
     finally:
         loop_body(opts, gstate, print_file, shutdown=True)

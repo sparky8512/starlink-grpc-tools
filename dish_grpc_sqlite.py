@@ -303,7 +303,7 @@ def main():
     except sqlite3.Error as e:
         logging.error("Database error: %s", e)
         rc = 1
-    except Terminated:
+    except (KeyboardInterrupt, Terminated):
         pass
     finally:
         loop_body(opts, gstate, shutdown=True)
