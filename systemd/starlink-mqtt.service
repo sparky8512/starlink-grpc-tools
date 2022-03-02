@@ -1,0 +1,12 @@
+[Unit]
+Description=Starlink GRPC to MQTT exporter
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/starlink-grpc-tools/
+Environment=MQTT_HOST=localhost MQTT_PORT=1883 MQTT_USERNAME=<changeme> MQTT_PASSWORD=<changeme> MQTT_SSL=false
+ExecStart=/opt/starlink-grpc-tools/venv/bin/python3 dish_grpc_mqtt.py -t 10 status alert_detail
+
+[Install]
+WantedBy=multi-user.target

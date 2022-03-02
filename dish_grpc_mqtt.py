@@ -15,9 +15,12 @@ Where *id_value* is the *id* value from the dish status information.
 """
 
 import logging
+import os
+import signal
 import sys
 import time
 import json
+import math
 
 
 try:
@@ -31,6 +34,14 @@ import paho.mqtt.publish
 import dish_common
 
 HOST_DEFAULT = "localhost"
+
+class Terminated(Exception):
+    pass
+
+
+def handle_sigterm(signum, frame):
+    # Turn SIGTERM into an exception so main loop can clean up
+    raise Terminated
 
 
 def parse_args():
@@ -72,6 +83,29 @@ def parse_args():
     else:
         parser.epilog += "\nSSL support options not available due to missing ssl module"
 
+    env_map = (
+        ("MQTT_HOST", "hostname"),
+        ("MQTT_PORT", "port"),
+        ("MQTT_USERNAME", "username"),
+        ("MQTT_PASSWORD", "password"),
+        ("MQTT_SSL", "tls"),
+    )
+    env_defaults = {}
+    for var, opt in env_map:
+        # check both set and not empty string
+        val = os.environ.get(var)
+        if val:
+            if var == "MQTT_SSL":
+                if val == "insecure":
+                    env_defaults[opt] = False
+                elif val == "secure":
+                    env_defaults[opt] = True
+                else:
+                    env_defaults["ssl_ca_cert"] = val
+            else:
+                env_defaults[opt] = val
+    parser.set_defaults(**env_defaults)
+
     opts = dish_common.run_arg_parser(parser, need_id=True)
 
     if opts.username is None and opts.password is not None:
@@ -102,7 +136,9 @@ def loop_body(opts, gstate):
             if not "dish_{0}".format(category) in data:
                 data["dish_{0}".format(category)] = {}
 
-            data["dish_{0}".format(category)].update({key: val})
+            # Skip NaN values that occur on startup because they can upset Javascript JSON parsers
+            if not ((type(val) == float) and math.isnan(val)):
+                data["dish_{0}".format(category)].update({key: val})
 
 
         def cb_add_sequence(key, val, category, _):
@@ -145,6 +181,8 @@ def main():
 
     gstate = dish_common.GlobalState(target=opts.target)
 
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
     try:
         next_loop = time.monotonic()
         while True:
@@ -155,10 +193,11 @@ def main():
                 time.sleep(next_loop - now)
             else:
                 break
+    except Terminated:
+        pass
     finally:
         gstate.shutdown()
-
-    sys.exit(rc)
+        sys.exit(rc)
 
 
 if __name__ == '__main__':
