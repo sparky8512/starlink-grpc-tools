@@ -163,7 +163,7 @@ git clone <git url>
 cd starlink-grpc-tool
 python3 -m venv venv
 source venv/bin/activate.sh
-pip3 install -r requrements.txt
+pip3 install -r requirements.txt
 sudo cp systemd/starlink-influx2.service /etc/systemd/starlink-influx2.service
 sudo <your favorite editor> /etc/systemd/system/starlink-influx2.service
 # Set influx url, token, bucket and org
