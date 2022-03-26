@@ -618,8 +618,13 @@ def status_data(context=None):
         if field.number < 65:
             alert_bits |= (1 if value else 0) << (field.number - 1)
 
-    obstruction_duration = status.obstruction_stats.avg_prolonged_obstruction_duration_s
-    obstruction_interval = status.obstruction_stats.avg_prolonged_obstruction_interval_s
+    if (status.obstruction_stats.avg_prolonged_obstruction_duration_s > 0.0 and not
+        math.isnan(status.obstruction_stats.avg_prolonged_obstruction_interval_s)):
+        obstruction_duration = status.obstruction_stats.avg_prolonged_obstruction_duration_s
+        obstruction_interval = status.obstruction_stats.avg_prolonged_obstruction_interval_s
+    else:
+        obstruction_duration = None
+        obstruction_interval = None
 
     return {
         "id": status.device_info.id,
