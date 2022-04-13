@@ -110,7 +110,7 @@ def parse_args():
 def open_out_file(opts, mode):
     if opts.out_file == "-":
         # open new file, so it can be closed later without affecting sys.stdout
-        return os.fdopen(sys.stdout.fileno(), "w", closefd=False)
+        return os.fdopen(sys.stdout.fileno(), "w", buffering=1, closefd=False)
     return open(opts.out_file, mode, buffering=1)
 
 
