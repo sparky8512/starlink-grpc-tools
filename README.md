@@ -75,6 +75,16 @@ python3 dish_obstruction_map.py -t 3600 obstructions_%s.png
 
 Run it with the `-h` command line option for full usage details, including control of the map colors and color modes.
 
+#### Reboot and stow control
+
+`dish_control.sh` is a simple stand alone script that can issue reboot, stow, or unstow commands to the dish:
+```shell script
+python3 dish_control.py reboot
+python3 dish_control.py stow
+python3 dish_control.py unstow
+```
+These operations can also be done using `grpcurl`, thus avoiding the need to use Python or install the required Python module dependencies. See [here](https://github.com/sparky8512/starlink-grpc-tools/wiki/Useful-grpcurl-commands) for specific `grpcurl` commands for these operations.
+
 ### The JSON parser script
 
 `dish_json_text.py` operates on a JSON format data representation of the protocol buffer messages, such as that output by [gRPCurl](https://github.com/fullstorydev/grpcurl). The command lines below assume `grpcurl` is installed in the runtime PATH. If that's not the case, just substitute in the full path to the command.
@@ -96,7 +106,7 @@ The one bit of functionality this script has over the grpc scripts is that it su
 ```shell script
 python3 dump_dish_status.py
 ```
-and revel in copious amounts of dish status information. OK, maybe it's not as impressive as all that. This one is really just meant to be a starting point for real functionality to be added to it.
+and revel in copious amounts of dish status information. OK, maybe it's not as impressive as all that. This one is really just meant to be a starting point for real functionality to be added to it. The grpc example in this script assumes you have the [generated gRPC protocol modules](https://github.com/sparky8512/starlink-grpc-tools/wiki/gRPC-Protocol-Modules). For a (relatively) simple example of using reflection to avoid that requirement, see `dish_control.py`.
 
 `poll_history.py` is another silly example, but this one illustrates how to periodically poll the status and/or bulk history data using the `starlink_grpc` module's API. It's not really useful by itself, but if you really want to, you can run it as:
 ```shell script
@@ -180,8 +190,6 @@ Note that feeding a dashboard will likely need the `-t` script option to `dish_g
 ## To Be Done (Maybe, but Probably Not)
 
 The [Wiki for this GitHub project](https://github.com/sparky8512/starlink-grpc-tools/wiki) has a little more information, and was originally planned to have more detail on some aspects of the history data, but that's mostly been obsoleted by changes to the gRPC service. It still may be updated some day with more use case examples or other information. In the mean time, it is configured as editable by anyone with a GitHub login, so if you have relevant content you believe to be useful, feel free to add it.
-
-There are `reboot` and `dish_stow` requests in the Device protocol, too, so it should be trivial to write a command that initiates dish reboot and stow operations. These are easy enough to do with `grpcurl`, though, as there is no need to parse through the response data. For that matter, they're easy enough to do with the Starlink app.
 
 No further data collection functionality is planned at this time. If there's something you'd like to see added, please feel free to open a feature request issue. Bear in mind, though, that functionality will be limited to that which the Starlink gRPC services support. In general, those services are limited to what is required by the Starlink app, so unless the app has some related feature, it is unlikely the gRPC services will be sufficient to implement it in these tools.
 
