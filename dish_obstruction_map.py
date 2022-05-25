@@ -25,7 +25,11 @@ LOOP_TIME_DEFAULT = 0
 
 
 def loop_body(opts, context):
-    snr_data = starlink_grpc.obstruction_map(context)
+    try:
+        snr_data = starlink_grpc.obstruction_map(context)
+    except starlink_grpc.GrpcError as e:
+        logging.error("Failed getting obstruction map data: %s", str(e))
+        return 1
 
     def pixel_bytes(row):
         for point in row:
