@@ -20,5 +20,4 @@ print(response)
 print("Software version:", response.dish_get_status.device_info.software_version)
 
 # Check if connected
-print("Connected" if response.dish_get_status.state ==
-      dish_pb2.DishState.CONNECTED else "Not connected")
+print("Not connected" if response.dish_get_status.HasField("outage") else "Connected")
