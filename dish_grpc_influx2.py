@@ -33,7 +33,7 @@ from influxdb_client import InfluxDBClient, WriteOptions, WritePrecision
 
 import dish_common
 
-HOST_URL = "localhost:8086"
+URL_DEFAULT = "http://localhost:8086"
 BUCKET_DEFAULT = "starlinkstats"
 BULK_MEASUREMENT = "spacex.starlink.user_terminal.history"
 FLUSH_LIMIT = 6
@@ -51,14 +51,14 @@ def handle_sigterm(signum, frame):
 
 
 def parse_args():
-    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB 2.0 database")
+    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB 2.x database")
 
-    group = parser.add_argument_group(title="InfluxDB 2.0 database options")
+    group = parser.add_argument_group(title="InfluxDB 2.x database options")
     group.add_argument("-u",
                        "--url",
-                       default=HOST_URL,
+                       default=URL_DEFAULT,
                        dest="url",
-                       help="URL or IP AND Port of the InfluxDB 2.0 Host, default: " + HOST_URL)
+                       help="URL of the InfluxDB 2.x server, default: " + URL_DEFAULT)
     group.add_argument("-T", "--token", help="Token to access the bucket")
     group.add_argument("-B",
                        "--bucket",
