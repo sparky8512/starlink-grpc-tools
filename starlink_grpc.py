@@ -1,9 +1,10 @@
 """Helpers for grpc communication with a Starlink user terminal.
 
 This module contains functions for getting the history and status data and
-either return it as-is or parsed for some specific statistics.
+either return it as-is or parsed for some specific statistics, as well as a
+handful of functions related to dish control.
 
-Those functions return data grouped into sets, as follows.
+The history and status functions return data grouped into sets, as follows.
 
 Note:
     Functions that return field names may indicate which fields hold sequences
@@ -1245,3 +1246,57 @@ def obstruction_map(context=None):
 
     cols = map_data.num_cols
     return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
+
+
+def reboot(context=None):
+    """Request dish reboot operation.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(reboot={}), timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+        return 0
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except grpc.RpcError as e:
+        raise GrpcError(e)
+
+
+def set_stow_state(unstow=False, context=None):
+    """Request dish stow or unstow operation.
+
+    Args:
+        unstow (bool): If True, request an unstow operation, otherwise a stow
+            operation will be requested.
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(dish_stow={"unstow": unstow}), timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+        return 0
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except grpc.RpcError as e:
+        raise GrpcError(e)
