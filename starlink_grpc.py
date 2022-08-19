@@ -133,6 +133,10 @@ their nature, but the field names are pretty self-explanatory.
 : **alert_slow_ethernet_speeds** : Alert corresponding with bit 5 (bit mask
     32) in *alerts*.
 : **alert_roaming** : Alert corresponding with bit 6 (bit mask 64) in *alerts*.
+: **alert_install_pending** : Alert corresponding with bit 7 (bit mask 128) in
+    *alerts*.
+: **alert_is_heating** : Alert corresponding with bit 8 (bit mask 256) in
+    *alerts*.
 
 General history data
 --------------------
