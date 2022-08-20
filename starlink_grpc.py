@@ -366,7 +366,7 @@ HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_through
                   "uplink_throughput_bps")
 
 
-def resolve_imports(channel):
+def resolve_imports(channel: grpc.Channel):
     importer.resolve_lazy_imports(channel)
     global imports_pending
     imports_pending = False
@@ -824,7 +824,7 @@ def get_history(context: ChannelContext | None = None):
     Raises:
         grpc.RpcError: Communication or service error.
     """
-    def grpc_call(channel):
+    def grpc_call(channel: grpc.Channel):
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
@@ -834,7 +834,7 @@ def get_history(context: ChannelContext | None = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def _compute_sample_range(history, parse_samples, start=None, verbose=False):
+def _compute_sample_range(history, parse_samples: int, start: int | None = None, verbose: bool = False):
     current = int(history.current)
     samples = len(history.pop_ping_drop_rate)
 
@@ -881,7 +881,7 @@ def _compute_sample_range(history, parse_samples, start=None, verbose=False):
     return sample_range, current - start, current
 
 
-def concatenate_history(history1, history2, samples1=-1, start1=None, verbose=False):
+def concatenate_history(history1, history2, samples1: int = -1, start1: int = None, verbose: bool = False):
     """Append the sample-dependent fields of one history object to another.
 
     Note:
@@ -940,7 +940,7 @@ def concatenate_history(history1, history2, samples1=-1, start1=None, verbose=Fa
     return unwrapped
 
 
-def history_bulk_data(parse_samples, start=None, verbose=False, context: ChannelContext | None = None, history=None):
+def history_bulk_data(parse_samples: int, start: int | None = None, verbose: bool = False, context: ChannelContext | None = None, history=None):
     """Fetch history data for a range of samples.
 
     Args:
@@ -1014,12 +1014,12 @@ def history_bulk_data(parse_samples, start=None, verbose=False, context: Channel
     }
 
 
-def history_ping_stats(parse_samples, verbose=False, context=None):
+def history_ping_stats(parse_samples: int, verbose: bool = False, context: ChannelContext = None):
     """Deprecated. Use history_stats instead."""
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples, start=None, verbose=False, context: ChannelContext | None = None, history=None):
+def history_stats(parse_samples: int, start: int | None = None, verbose: bool = False, context: ChannelContext | None = None, history=None):
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
@@ -1217,7 +1217,7 @@ def get_obstruction_map(context: ChannelContext | None = None):
     Raises:
         grpc.RpcError: Communication or service error.
     """
-    def grpc_call(channel):
+    def grpc_call(channel: grpc.Channel):
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
@@ -1253,7 +1253,7 @@ def obstruction_map(context: ChannelContext | None = None):
     return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
 
 
-def reboot(context: ChannelContext | None = None):
+def reboot(context: ChannelContext | None = None) -> None:
     """Request dish reboot operation.
 
     Args:
@@ -1265,13 +1265,13 @@ def reboot(context: ChannelContext | None = None):
     Raises:
         GrpcError: Communication or service error.
     """
-    def grpc_call(channel):
+    def grpc_call(channel: grpc.Channel) -> None:
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
         stub.Handle(device_pb2.Request(reboot={}), timeout=REQUEST_TIMEOUT)
         # response is empty message in this case, so just ignore it
-        return 0
+        return None
 
     try:
         call_with_channel(grpc_call, context=context)
@@ -1279,7 +1279,7 @@ def reboot(context: ChannelContext | None = None):
         raise GrpcError(e)
 
 
-def set_stow_state(unstow=False, context: ChannelContext | None = None):
+def set_stow_state(unstow: bool = False, context: ChannelContext | None = None) -> None:
     """Request dish stow or unstow operation.
 
     Args:
@@ -1293,13 +1293,13 @@ def set_stow_state(unstow=False, context: ChannelContext | None = None):
     Raises:
         GrpcError: Communication or service error.
     """
-    def grpc_call(channel):
+    def grpc_call(channel: grpc.Channel) -> None:
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
         stub.Handle(device_pb2.Request(dish_stow={"unstow": unstow}), timeout=REQUEST_TIMEOUT)
         # response is empty message in this case, so just ignore it
-        return 0
+        return None
 
     try:
         call_with_channel(grpc_call, context=context)
