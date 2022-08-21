@@ -396,7 +396,7 @@ class ChannelContext:
     `close()` should be called on the object when it is no longer
     in use.
     """
-    def __init__(self, target: str | None = None) -> None:
+    def __init__(self, target: Optional[str] = None) -> None:
         self.channel = None
         self.target = "192.168.100.1:9200" if target is None else target
 
@@ -834,7 +834,7 @@ def get_history(context: Optional[ChannelContext] = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def _compute_sample_range(history, parse_samples: int, start: int | None = None, verbose: bool = False):
+def _compute_sample_range(history, parse_samples: int, start: Optional[int] = None, verbose: bool = False):
     current = int(history.current)
     samples = len(history.pop_ping_drop_rate)
 
@@ -940,7 +940,7 @@ def concatenate_history(history1, history2, samples1: int = -1, start1: Optional
     return unwrapped
 
 
-def history_bulk_data(parse_samples: int, start: int | None = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
+def history_bulk_data(parse_samples: int, start: Optional[int] = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
     """Fetch history data for a range of samples.
 
     Args:
@@ -1019,7 +1019,7 @@ def history_ping_stats(parse_samples: int, verbose: bool = False, context: Optio
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples: int, start: int | None = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
+def history_stats(parse_samples: int, start: Optional[int] = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
