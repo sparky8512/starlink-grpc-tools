@@ -343,7 +343,7 @@ period.
 from itertools import chain
 import math
 import statistics
-from typing import Tuple
+from typing import Optional, Tuple
 
 import grpc
 
@@ -413,7 +413,7 @@ class ChannelContext:
         self.channel = None
 
 
-def call_with_channel(function, *args, context: ChannelContext = None, **kwargs):
+def call_with_channel(function, *args, context: Optional[ChannelContext] = None, **kwargs):
     """Call a function with a channel object.
 
     Args:
@@ -437,7 +437,7 @@ def call_with_channel(function, *args, context: ChannelContext = None, **kwargs)
                 raise
 
 
-def status_field_names(context: ChannelContext | None = None):
+def status_field_names(context: Optional[ChannelContext] = None):
     """Return the field names of the status data.
 
     Note:
@@ -491,7 +491,7 @@ def status_field_names(context: ChannelContext | None = None):
     ], alert_names
 
 
-def status_field_types(context: ChannelContext | None = None):
+def status_field_types(context: Optional[ChannelContext] = None):
     """Return the field types of the status data.
 
     Return the type classes for each field. For sequence types, the type of
@@ -541,7 +541,7 @@ def status_field_types(context: ChannelContext | None = None):
     ], [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
 
 
-def get_status(context: ChannelContext | None = None):
+def get_status(context: Optional[ChannelContext] = None):
     """Fetch status data and return it in grpc structure format.
 
     Args:
@@ -563,7 +563,7 @@ def get_status(context: ChannelContext | None = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def get_id(context: ChannelContext | None = None):
+def get_id(context: Optional[ChannelContext] = None):
     """Return the ID from the dish status information.
 
     Args:
@@ -584,7 +584,7 @@ def get_id(context: ChannelContext | None = None):
         raise GrpcError(e)
 
 
-def status_data(context: ChannelContext | None = None):
+def status_data(context: Optional[ChannelContext] = None):
     """Fetch current status data.
 
     Args:
@@ -812,7 +812,7 @@ def history_stats_field_types():
     ]
 
 
-def get_history(context: ChannelContext | None = None):
+def get_history(context: Optional[ChannelContext] = None):
     """Fetch history data and return it in grpc structure format.
 
     Args:
@@ -881,7 +881,7 @@ def _compute_sample_range(history, parse_samples: int, start: int | None = None,
     return sample_range, current - start, current
 
 
-def concatenate_history(history1, history2, samples1: int = -1, start1: int = None, verbose: bool = False):
+def concatenate_history(history1, history2, samples1: int = -1, start1: Optional[int] = None, verbose: bool = False):
     """Append the sample-dependent fields of one history object to another.
 
     Note:
@@ -940,7 +940,7 @@ def concatenate_history(history1, history2, samples1: int = -1, start1: int = No
     return unwrapped
 
 
-def history_bulk_data(parse_samples: int, start: int | None = None, verbose: bool = False, context: ChannelContext | None = None, history=None):
+def history_bulk_data(parse_samples: int, start: int | None = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
     """Fetch history data for a range of samples.
 
     Args:
@@ -1014,12 +1014,12 @@ def history_bulk_data(parse_samples: int, start: int | None = None, verbose: boo
     }
 
 
-def history_ping_stats(parse_samples: int, verbose: bool = False, context: ChannelContext = None):
+def history_ping_stats(parse_samples: int, verbose: bool = False, context: Optional[ChannelContext] = None):
     """Deprecated. Use history_stats instead."""
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples: int, start: int | None = None, verbose: bool = False, context: ChannelContext | None = None, history=None):
+def history_stats(parse_samples: int, start: int | None = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
@@ -1205,7 +1205,7 @@ def history_stats(parse_samples: int, start: int | None = None, verbose: bool = 
     }
 
 
-def get_obstruction_map(context: ChannelContext | None = None):
+def get_obstruction_map(context: Optional[ChannelContext] = None):
     """Fetch obstruction map data and return it in grpc structure format.
 
     Args:
@@ -1228,7 +1228,7 @@ def get_obstruction_map(context: ChannelContext | None = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def obstruction_map(context: ChannelContext | None = None):
+def obstruction_map(context: Optional[ChannelContext] = None):
     """Fetch current obstruction map data.
 
     Args:
@@ -1253,7 +1253,7 @@ def obstruction_map(context: ChannelContext | None = None):
     return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
 
 
-def reboot(context: ChannelContext | None = None) -> None:
+def reboot(context: Optional[ChannelContext] = None) -> None:
     """Request dish reboot operation.
 
     Args:
@@ -1279,7 +1279,7 @@ def reboot(context: ChannelContext | None = None) -> None:
         raise GrpcError(e)
 
 
-def set_stow_state(unstow: bool = False, context: ChannelContext | None = None) -> None:
+def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = None) -> None:
     """Request dish stow or unstow operation.
 
     Args:
