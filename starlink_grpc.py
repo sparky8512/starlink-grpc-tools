@@ -484,6 +484,7 @@ def status_field_names(context: Optional[ChannelContext] = None):
         "obstruction_interval",
         "direction_azimuth",
         "direction_elevation",
+        "is_snr_above_noise_floor",
     ], [
         "wedges_fraction_obstructed[12]",
         "raw_wedges_fraction_obstructed[12]",
@@ -534,6 +535,7 @@ def status_field_types(context: Optional[ChannelContext] = None):
         float,  # obstruction_interval
         float,  # direction_azimuth
         float,  # direction_elevation
+        bool, # is_snr_above_noise_floor
     ], [
         float,  # wedges_fraction_obstructed[]
         float,  # raw_wedges_fraction_obstructed[]
@@ -652,6 +654,7 @@ def status_data(context: Optional[ChannelContext] = None):
         "obstruction_interval": obstruction_interval,
         "direction_azimuth": status.boresight_azimuth_deg,
         "direction_elevation": status.boresight_elevation_deg,
+        "is_snr_above_noise_floor": status.is_snr_above_noise_floor,
     }, {
         "wedges_fraction_obstructed[]": status.obstruction_stats.wedge_abs_fraction_obstructed,
         "raw_wedges_fraction_obstructed[]": status.obstruction_stats.wedge_fraction_obstructed,
