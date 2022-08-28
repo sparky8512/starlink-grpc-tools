@@ -345,8 +345,15 @@ period.
 
 from itertools import chain
 import math
+import re
 import statistics
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
+try:
+    from typing import TypedDict
+    _typed_dict_ok = True
+except ImportError:
+    # Python 3.7 does not have TypedDict
+    _typed_dict_ok = False
 
 import grpc
 
@@ -367,6 +374,64 @@ REQUEST_TIMEOUT = 10
 
 HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
                   "uplink_throughput_bps")
+
+_STATUS_TYPES = {
+        "id": str,
+        "hardware_version": str,
+        "software_version": str,
+        "state": str,
+        "uptime": int,
+        "snr": float,
+        "seconds_to_first_nonempty_slot": float,
+        "pop_ping_drop_rate": float,
+        "downlink_throughput_bps": float,
+        "uplink_throughput_bps": float,
+        "pop_ping_latency_ms": float,
+        "alerts": int,
+        "fraction_obstructed": float,
+        "currently_obstructed": bool,
+        "seconds_obstructed": float,
+        "obstruction_duration": float,
+        "obstruction_interval": float,
+        "direction_azimuth": float,
+        "direction_elevation": float,
+        "is_snr_above_noise_floor": bool,
+}
+
+_OBSTRUCTION_TYPES = {
+        "wedges_fraction_obstructed[12]": float,
+        "raw_wedges_fraction_obstructed[12]": float,
+        "valid_s": float,
+}
+
+_OPTIONAL_FIELDS = { "snr", "seconds_obstructed", "obstruction_duration", "obstruction_interval" }
+
+# Minimal parsing for use below. For a more complete regex, see
+# dish_common.BRACKETS_RE
+_TYPE_HINT_RE = re.compile(r"[^[]*\[(\d+,|)")
+
+
+def _type_hints(types):
+    def xform(items):
+        for key, val in items:
+            seq_match = _TYPE_HINT_RE.match(key)
+            opt_val = Optional[val] if key in _OPTIONAL_FIELDS else val
+            if seq_match is None:
+                yield key, opt_val
+            else:
+                # Field names in returned data dicts do not include sequence
+                # length, so strip it out if present.
+                yield seq_match.group() + "]", Sequence[opt_val]
+    return { key: val for key, val in xform(types.items()) }
+
+
+if _typed_dict_ok:
+    StatusDict = TypedDict("StatusDict", _type_hints(_STATUS_TYPES))
+    ObstructionDict = TypedDict("ObstructionDict", _type_hints(_OBSTRUCTION_TYPES))
+else:
+    StatusDict = Dict[str, Any]
+    ObstructionDict = Dict[str, Any]
+AlertDict = Dict[str, bool]
 
 
 def resolve_imports(channel: grpc.Channel):
@@ -467,32 +532,7 @@ def status_field_names(context: Optional[ChannelContext] = None):
     for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
 
-    return [
-        "id",
-        "hardware_version",
-        "software_version",
-        "state",
-        "uptime",
-        "snr",
-        "seconds_to_first_nonempty_slot",
-        "pop_ping_drop_rate",
-        "downlink_throughput_bps",
-        "uplink_throughput_bps",
-        "pop_ping_latency_ms",
-        "alerts",
-        "fraction_obstructed",
-        "currently_obstructed",
-        "seconds_obstructed",
-        "obstruction_duration",
-        "obstruction_interval",
-        "direction_azimuth",
-        "direction_elevation",
-        "is_snr_above_noise_floor",
-    ], [
-        "wedges_fraction_obstructed[12]",
-        "raw_wedges_fraction_obstructed[12]",
-        "valid_s",
-    ], alert_names
+    return _STATUS_TYPES.keys(), _OBSTRUCTION_TYPES.keys(), alert_names
 
 
 def status_field_types(context: Optional[ChannelContext] = None):
@@ -518,32 +558,7 @@ def status_field_types(context: Optional[ChannelContext] = None):
             call_with_channel(resolve_imports, context=context)
         except grpc.RpcError as e:
             raise GrpcError(e)
-    return [
-        str,  # id
-        str,  # hardware_version
-        str,  # software_version
-        str,  # state
-        int,  # uptime
-        float,  # snr
-        float,  # seconds_to_first_nonempty_slot
-        float,  # pop_ping_drop_rate
-        float,  # downlink_throughput_bps
-        float,  # uplink_throughput_bps
-        float,  # pop_ping_latency_ms
-        int,  # alerts
-        float,  # fraction_obstructed
-        bool,  # currently_obstructed
-        float,  # seconds_obstructed
-        float,  # obstruction_duration
-        float,  # obstruction_interval
-        float,  # direction_azimuth
-        float,  # direction_elevation
-        bool, # is_snr_above_noise_floor
-    ], [
-        float,  # wedges_fraction_obstructed[]
-        float,  # raw_wedges_fraction_obstructed[]
-        float,  # valid_s
-    ], [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
+    return _STATUS_TYPES.values(), _OBSTRUCTION_TYPES.values(), [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
 
 
 def get_status(context: Optional[ChannelContext] = None):
@@ -589,7 +604,7 @@ def get_id(context: Optional[ChannelContext] = None):
         raise GrpcError(e)
 
 
-def status_data(context: Optional[ChannelContext] = None):
+def status_data(context: Optional[ChannelContext] = None) -> Tuple[StatusDict, ObstructionDict, AlertDict]:
     """Fetch current status data.
 
     Args:
