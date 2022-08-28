@@ -81,7 +81,9 @@ This group holds information about the current state of the user terminal.
     terminal is communicating.
 : **direction_elevation** : Elevation angle, in degrees, of the direction in
     which the user terminal's dish antenna is physically pointing.
-: **is_snr_above_noise_floor** : True if SNR is more than 3dB above the noise floor.
+: **is_snr_above_noise_floor** : Boolean indicating whether or not the dish
+    considers the signal to noise ratio to be above some minimum threshold for
+    connectivity, currently 3dB.
 
 Obstruction detail status data
 ------------------------------
@@ -449,8 +451,8 @@ def status_field_names(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 3 lists, with status data field names, alert detail field
-        names, and obstruction detail field names, in that order.
+        A tuple with 3 lists, with status data field names, obstruction detail
+        field names, and alert detail field names, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -504,8 +506,8 @@ def status_field_types(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 3 lists, with status data field types, alert detail field
-        types, and obstruction detail field types, in that order.
+        A tuple with 3 lists, with status data field types, obstruction detail
+        field types, and alert detail field types, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -595,8 +597,8 @@ def status_data(context: Optional[ChannelContext] = None):
             across repeated calls.
 
     Returns:
-        A tuple with 3 dicts, mapping status data field names, alert detail
-        field names, and obstruction detail field names to their respective
+        A tuple with 3 dicts, mapping status data field names, obstruction
+        detail field names, and alert detail field names to their respective
         values, in that order.
 
     Raises:
