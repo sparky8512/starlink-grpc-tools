@@ -81,6 +81,7 @@ This group holds information about the current state of the user terminal.
     terminal is communicating.
 : **direction_elevation** : Elevation angle, in degrees, of the direction in
     which the user terminal's dish antenna is physically pointing.
+: **is_snr_above_noise_floor** : True if SNR is more than 3dB above the noise floor.
 
 Obstruction detail status data
 ------------------------------
