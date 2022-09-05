@@ -376,35 +376,92 @@ HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_through
                   "uplink_throughput_bps")
 
 _STATUS_TYPES = {
-        "id": str,
-        "hardware_version": str,
-        "software_version": str,
-        "state": str,
-        "uptime": int,
-        "snr": float,
-        "seconds_to_first_nonempty_slot": float,
-        "pop_ping_drop_rate": float,
-        "downlink_throughput_bps": float,
-        "uplink_throughput_bps": float,
-        "pop_ping_latency_ms": float,
-        "alerts": int,
-        "fraction_obstructed": float,
-        "currently_obstructed": bool,
-        "seconds_obstructed": float,
-        "obstruction_duration": float,
-        "obstruction_interval": float,
-        "direction_azimuth": float,
-        "direction_elevation": float,
-        "is_snr_above_noise_floor": bool,
+    "id": str,
+    "hardware_version": str,
+    "software_version": str,
+    "state": str,
+    "uptime": int,
+    "snr": float,
+    "seconds_to_first_nonempty_slot": float,
+    "pop_ping_drop_rate": float,
+    "downlink_throughput_bps": float,
+    "uplink_throughput_bps": float,
+    "pop_ping_latency_ms": float,
+    "alerts": int,
+    "fraction_obstructed": float,
+    "currently_obstructed": bool,
+    "seconds_obstructed": float,
+    "obstruction_duration": float,
+    "obstruction_interval": float,
+    "direction_azimuth": float,
+    "direction_elevation": float,
+    "is_snr_above_noise_floor": bool,
 }
 
 _OBSTRUCTION_TYPES = {
-        "wedges_fraction_obstructed[12]": float,
-        "raw_wedges_fraction_obstructed[12]": float,
-        "valid_s": float,
+    "wedges_fraction_obstructed[12]": float,
+    "raw_wedges_fraction_obstructed[12]": float,
+    "valid_s": float,
 }
 
-_OPTIONAL_FIELDS = { "snr", "seconds_obstructed", "obstruction_duration", "obstruction_interval" }
+_HISTORY_GENERAL_TYPES = {
+    "samples": int,
+    "end_counter": int,
+}
+
+_HISTORY_BULK_TYPES = {
+    "pop_ping_drop_rate[]": float,
+    "pop_ping_latency_ms[]": float,
+    "downlink_throughput_bps[]": float,
+    "uplink_throughput_bps[]": float,
+    "snr[]": float,
+    "scheduled[]": bool,
+    "obstructed[]": bool,
+}
+
+_PING_DROP_TYPES = {
+    "total_ping_drop": float,
+    "count_full_ping_drop": int,
+    "count_obstructed": int,
+    "total_obstructed_ping_drop": float,
+    "count_full_obstructed_ping_drop": int,
+    "count_unscheduled": int,
+    "total_unscheduled_ping_drop": float,
+    "count_full_unscheduled_ping_drop": int,
+}
+
+_PING_DROP_RL_TYPES = {
+    "init_run_fragment": int,
+    "final_run_fragment": int,
+    "run_seconds[1,61]": int,
+    "run_minutes[1,61]": int,
+}
+
+_PING_LATENCY_TYPES = {
+    "mean_all_ping_latency": float,
+    "deciles_all_ping_latency[11]": float,
+    "mean_full_ping_latency": float,
+    "deciles_full_ping_latency[11]": float,
+    "stdev_full_ping_latency": float,
+}
+
+_LOADED_LATENCY_TYPES = {
+    "load_bucket_samples[15]": int,
+    "load_bucket_min_latency[15]": float,
+    "load_bucket_median_latency[15]": float,
+    "load_bucket_max_latency[15]": float,
+}
+
+_USAGE_TYPES = {
+    "download_usage": int,
+    "upload_usage": int,
+}
+
+_OPTIONAL_FIELDS = {
+    "load_bucket_min_latency[15]", "load_bucket_median_latency[15]", "load_bucket_max_latency[15]",
+    "obstructed[]", "obstruction_duration", "obstruction_interval", "scheduled[]",
+    "seconds_obstructed", "snr", "snr[]"
+}
 
 # Minimal parsing for use below. For a more complete regex, see
 # dish_common.BRACKETS_RE
@@ -422,15 +479,39 @@ def _type_hints(types):
                 # Field names in returned data dicts do not include sequence
                 # length, so strip it out if present.
                 yield seq_match.group() + "]", Sequence[opt_val]
-    return { key: val for key, val in xform(types.items()) }
+
+    return {key: val for key, val in xform(types.items())}
+
+
+def _type_hints_bulk(types):
+    # As a special case, bulk history is all sequences, but does not include
+    # the brackets suffix in the returned data dict keys.
+    return {
+        key[:-2]: Sequence[Optional[val] if key in _OPTIONAL_FIELDS else val]
+        for key, val in types.items()
+    }
 
 
 if _typed_dict_ok:
     StatusDict = TypedDict("StatusDict", _type_hints(_STATUS_TYPES))
     ObstructionDict = TypedDict("ObstructionDict", _type_hints(_OBSTRUCTION_TYPES))
+    HistGeneralDict = TypedDict("HistGeneralDict", _type_hints(_HISTORY_GENERAL_TYPES))
+    HistBulkDict = TypedDict("HistBulkDict", _type_hints_bulk(_HISTORY_BULK_TYPES))
+    PingDropDict = TypedDict("PingDropDict", _type_hints(_PING_DROP_TYPES))
+    PingDropRlDict = TypedDict("PingDropRlDict", _type_hints(_PING_DROP_RL_TYPES))
+    PingLatencyDict = TypedDict("PingLatencyDict", _type_hints(_PING_LATENCY_TYPES))
+    LoadedLatencyDict = TypedDict("LoadedLatencyDict", _type_hints(_LOADED_LATENCY_TYPES))
+    UsageDict = TypedDict("UsageDict", _type_hints(_USAGE_TYPES))
 else:
     StatusDict = Dict[str, Any]
     ObstructionDict = Dict[str, Any]
+    HistGeneralDict = Dict[str, Any]
+    HistBulkDict = Dict[str, Any]
+    PingDropDict = Dict[str, Any]
+    PingDropRlDict = Dict[str, Any]
+    PingLatencyDict = Dict[str, Any]
+    LoadedLatencyDict = Dict[str, Any]
+    UsageDict = Dict[str, Any]
 AlertDict = Dict[str, bool]
 
 
@@ -558,7 +639,8 @@ def status_field_types(context: Optional[ChannelContext] = None):
             call_with_channel(resolve_imports, context=context)
         except grpc.RpcError as e:
             raise GrpcError(e)
-    return _STATUS_TYPES.values(), _OBSTRUCTION_TYPES.values(), [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
+    return (_STATUS_TYPES.values(), _OBSTRUCTION_TYPES.values(),
+            [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields))
 
 
 def get_status(context: Optional[ChannelContext] = None):
@@ -604,7 +686,8 @@ def get_id(context: Optional[ChannelContext] = None):
         raise GrpcError(e)
 
 
-def status_data(context: Optional[ChannelContext] = None) -> Tuple[StatusDict, ObstructionDict, AlertDict]:
+def status_data(
+        context: Optional[ChannelContext] = None) -> Tuple[StatusDict, ObstructionDict, AlertDict]:
     """Fetch current status data.
 
     Args:
@@ -690,18 +773,7 @@ def history_bulk_field_names():
         A tuple with 2 lists, the first with general data names, the second
         with bulk history data names.
     """
-    return [
-        "samples",
-        "end_counter",
-    ], [
-        "pop_ping_drop_rate[]",
-        "pop_ping_latency_ms[]",
-        "downlink_throughput_bps[]",
-        "uplink_throughput_bps[]",
-        "snr[]",
-        "scheduled[]",
-        "obstructed[]",
-    ]
+    return _HISTORY_GENERAL_TYPES.keys(), _HISTORY_BULK_TYPES.keys()
 
 
 def history_bulk_field_types():
@@ -714,18 +786,7 @@ def history_bulk_field_types():
         A tuple with 2 lists, the first with general data types, the second
         with bulk history data types.
     """
-    return [
-        int,  # samples
-        int,  # end_counter
-    ], [
-        float,  # pop_ping_drop_rate[]
-        float,  # pop_ping_latency_ms[]
-        float,  # downlink_throughput_bps[]
-        float,  # uplink_throughput_bps[]
-        float,  # snr[]
-        bool,  # scheduled[]
-        bool,  # obstructed[]
-    ]
+    return _HISTORY_GENERAL_TYPES.values(), _HISTORY_BULK_TYPES.values()
 
 
 def history_ping_field_names():
@@ -749,38 +810,8 @@ def history_stats_field_names():
             additional data groups, so it not recommended for the caller to
             assume exactly 6 elements.
     """
-    return [
-        "samples",
-        "end_counter",
-    ], [
-        "total_ping_drop",
-        "count_full_ping_drop",
-        "count_obstructed",
-        "total_obstructed_ping_drop",
-        "count_full_obstructed_ping_drop",
-        "count_unscheduled",
-        "total_unscheduled_ping_drop",
-        "count_full_unscheduled_ping_drop",
-    ], [
-        "init_run_fragment",
-        "final_run_fragment",
-        "run_seconds[1,61]",
-        "run_minutes[1,61]",
-    ], [
-        "mean_all_ping_latency",
-        "deciles_all_ping_latency[11]",
-        "mean_full_ping_latency",
-        "deciles_full_ping_latency[11]",
-        "stdev_full_ping_latency",
-    ], [
-        "load_bucket_samples[15]",
-        "load_bucket_min_latency[15]",
-        "load_bucket_median_latency[15]",
-        "load_bucket_max_latency[15]",
-    ], [
-        "download_usage",
-        "upload_usage",
-    ]
+    return (_HISTORY_GENERAL_TYPES.keys(), _PING_DROP_TYPES.keys(), _PING_DROP_RL_TYPES.keys(),
+            _PING_LATENCY_TYPES.keys(), _LOADED_LATENCY_TYPES.keys(), _USAGE_TYPES.keys())
 
 
 def history_stats_field_types():
@@ -799,38 +830,9 @@ def history_stats_field_types():
             additional data groups, so it not recommended for the caller to
             assume exactly 6 elements.
     """
-    return [
-        int,  # samples
-        int,  # end_counter
-    ], [
-        float,  # total_ping_drop
-        int,  # count_full_ping_drop
-        int,  # count_obstructed
-        float,  # total_obstructed_ping_drop
-        int,  # count_full_obstructed_ping_drop
-        int,  # count_unscheduled
-        float,  # total_unscheduled_ping_drop
-        int,  # count_full_unscheduled_ping_drop
-    ], [
-        int,  # init_run_fragment
-        int,  # final_run_fragment
-        int,  # run_seconds[]
-        int,  # run_minutes[]
-    ], [
-        float,  # mean_all_ping_latency
-        float,  # deciles_all_ping_latency[]
-        float,  # mean_full_ping_latency
-        float,  # deciles_full_ping_latency[]
-        float,  # stdev_full_ping_latency
-    ], [
-        int,  # load_bucket_samples[]
-        float,  # load_bucket_min_latency[]
-        float,  # load_bucket_median_latency[]
-        float,  # load_bucket_max_latency[]
-    ], [
-        int,  # download_usage
-        int,  # upload_usage
-    ]
+    return (_HISTORY_GENERAL_TYPES.values(), _PING_DROP_TYPES.values(),
+            _PING_DROP_RL_TYPES.values(), _PING_LATENCY_TYPES.values(),
+            _LOADED_LATENCY_TYPES.values(), _USAGE_TYPES.values())
 
 
 def get_history(context: Optional[ChannelContext] = None):
@@ -961,7 +963,11 @@ def concatenate_history(history1, history2, samples1: int = -1, start1: Optional
     return unwrapped
 
 
-def history_bulk_data(parse_samples: int, start: Optional[int] = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
+def history_bulk_data(parse_samples: int,
+                      start: Optional[int] = None,
+                      verbose: bool = False,
+                      context: Optional[ChannelContext] = None,
+                      history=None) -> Tuple[HistGeneralDict, HistBulkDict]:
     """Fetch history data for a range of samples.
 
     Args:
@@ -1035,12 +1041,23 @@ def history_bulk_data(parse_samples: int, start: Optional[int] = None, verbose: 
     }
 
 
-def history_ping_stats(parse_samples: int, verbose: bool = False, context: Optional[ChannelContext] = None):
+def history_ping_stats(
+    parse_samples: int,
+    verbose: bool = False,
+    context: Optional[ChannelContext] = None
+) -> Tuple[HistGeneralDict, PingDropDict, PingDropRlDict, PingLatencyDict]:
     """Deprecated. Use history_stats instead."""
     return history_stats(parse_samples, verbose=verbose, context=context)[0:3]
 
 
-def history_stats(parse_samples: int, start: Optional[int] = None, verbose: bool = False, context: Optional[ChannelContext] = None, history=None):
+def history_stats(
+    parse_samples: int,
+    start: Optional[int] = None,
+    verbose: bool = False,
+    context: Optional[ChannelContext] = None,
+    history=None
+) -> Tuple[HistGeneralDict, PingDropDict, PingDropRlDict, PingLatencyDict, LoadedLatencyDict,
+           UsageDict]:
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
