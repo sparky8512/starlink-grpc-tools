@@ -568,7 +568,7 @@ def get_status(context: Optional[ChannelContext] = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def get_id(context: Optional[ChannelContext] = None):
+def get_id(context: Optional[ChannelContext] = None) -> str:
     """Return the ID from the dish status information.
 
     Args:
