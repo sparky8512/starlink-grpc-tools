@@ -140,6 +140,8 @@ their nature, but the field names are pretty self-explanatory.
     *alerts*.
 : **alert_is_heating** : Alert corresponding with bit 8 (bit mask 256) in
     *alerts*.
+: **alert_power_supply_thermal_throttle** : Alert corresponding with bit 9 (bit
+    mask 512) in *alerts*.
 
 General history data
 --------------------
