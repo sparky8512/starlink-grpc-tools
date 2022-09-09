@@ -352,10 +352,10 @@ try:
 except ImportError:
     # Python 3.7 does not have TypedDict, so fake it so the run time still
     # works, even though static type checker probably will not.
-    def TypedDict(name, types):
+    def TypedDict(name, types):  # pylint: disable=invalid-name
         return type(name, (dict,), {"__annotations__": types})
 
-    def get_args(tp: Any) -> tuple[Any, ...]:
+    def get_args(tp: Any) -> Tuple[Any, ...]:
         return tp.__args__
 
 
@@ -483,11 +483,11 @@ _FIELD_NAME_MAP = {
 
 
 def _field_names(hint_type):
-    return list(_FIELD_NAME_MAP.get(key, key) for key in get_type_hints(hint_type).keys())
+    return list(_FIELD_NAME_MAP.get(key, key) for key in get_type_hints(hint_type))
 
 
 def _field_names_bulk(hint_type):
-    return list(key + "[]" for key in get_type_hints(hint_type).keys())
+    return list(key + "[]" for key in get_type_hints(hint_type))
 
 
 def _field_types(hint_type):
