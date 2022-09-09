@@ -124,7 +124,7 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
         parser.error("Poll loops arg must be 2 or greater to be meaningful")
 
     # for convenience, set flags for whether any mode in a group is selected
-    opts.satus_mode = bool(set(STATUS_MODES).intersection(opts.mode))
+    opts.status_mode = bool(set(STATUS_MODES).intersection(opts.mode))
     opts.history_stats_mode = bool(set(HISTORY_STATS_MODES).intersection(opts.mode))
     opts.bulk_mode = "bulk_history" in opts.mode
 
@@ -250,7 +250,7 @@ def add_data_numeric(data, category, add_item, add_sequence):
 
 
 def get_status_data(opts, gstate, add_item, add_sequence):
-    if opts.satus_mode:
+    if opts.status_mode:
         timestamp = int(time.time())
         try:
             groups = starlink_grpc.status_data(context=gstate.context)

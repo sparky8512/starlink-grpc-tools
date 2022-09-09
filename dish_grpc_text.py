@@ -90,13 +90,13 @@ def parse_args():
 
     opts = dish_common.run_arg_parser(parser)
 
-    if (opts.history_stats_mode or opts.satus_mode) and opts.bulk_mode and not opts.verbose:
+    if (opts.history_stats_mode or opts.status_mode) and opts.bulk_mode and not opts.verbose:
         parser.error("bulk_history cannot be combined with other modes for CSV output")
 
     # Technically possible, but a pain to implement, so just disallow it. User
     # probably doesn't realize how weird it would be, anyway, given that stats
     # data reports at a different rate from status data in this case.
-    if opts.history_stats_mode and opts.satus_mode and not opts.verbose and opts.poll_loops > 1:
+    if opts.history_stats_mode and opts.status_mode and not opts.verbose and opts.poll_loops > 1:
         parser.error("usage of --poll-loops with history stats modes cannot be mixed with status "
                      "modes for CSV output")
 
@@ -127,7 +127,7 @@ def print_header(opts, print_file):
             else:
                 header.append(name)
 
-    if opts.satus_mode:
+    if opts.status_mode:
         context = starlink_grpc.ChannelContext(target=opts.target)
         try:
             name_groups = starlink_grpc.status_field_names(context=context)
