@@ -419,7 +419,7 @@ HistGeneralDict = TypedDict("HistGeneralDict", {"samples": int, "end_counter": i
 HistBulkDict = TypedDict(
     "HistBulkDict", {
         "pop_ping_drop_rate": Sequence[float],
-        "pop_ping_latency_ms": Sequence[float],
+        "pop_ping_latency_ms": Sequence[Optional[float]],
         "downlink_throughput_bps": Sequence[float],
         "uplink_throughput_bps": Sequence[float],
         "snr": Sequence[Optional[float]],
