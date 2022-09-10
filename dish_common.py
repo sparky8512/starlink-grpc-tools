@@ -16,6 +16,7 @@ from datetime import timezone
 import logging
 import re
 import time
+from typing import List
 
 import grpc
 
@@ -23,11 +24,11 @@ import starlink_grpc
 
 BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
 LOOP_TIME_DEFAULT = 0
-STATUS_MODES = ["status", "obstruction_detail", "alert_detail", "location"]
-HISTORY_STATS_MODES = [
+STATUS_MODES: List[str] = ["status", "obstruction_detail", "alert_detail", "location"]
+HISTORY_STATS_MODES: List[str] = [
     "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage"
 ]
-UNGROUPED_MODES = []
+UNGROUPED_MODES: List[str] = []
 
 
 def create_arg_parser(output_description, bulk_history=True):

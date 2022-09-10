@@ -362,7 +362,7 @@ period.
 from itertools import chain
 import math
 import statistics
-from typing import Any, Dict, Optional, Sequence, Tuple, get_type_hints
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, get_type_hints
 try:
     from typing import TypedDict, get_args
 except ImportError:
@@ -476,7 +476,7 @@ PingLatencyDict = TypedDict(
         "deciles_all_ping_latency[]": Sequence[float],
         "mean_full_ping_latency": float,
         "deciles_full_ping_latency[]": Sequence[float],
-        "stdev_full_ping_latency": float,
+        "stdev_full_ping_latency": Optional[float],
     })
 
 LoadedLatencyDict = TypedDict(
@@ -983,6 +983,7 @@ def _compute_sample_range(history, parse_samples: int, start: Optional[int] = No
 
     # Set the range for the requested set of samples. This will iterate
     # sample index in order from oldest to newest.
+    sample_range: Iterable[int]
     if start_offset < end_offset:
         sample_range = range(start_offset, end_offset)
     else:
@@ -1030,7 +1031,7 @@ def concatenate_history(history1, history2, samples1: int = -1, start1: Optional
             print("WARNING: Appending discontiguous samples. Polling interval probably too short.")
         new_samples = size2
 
-    unwrapped = UnwrappedHistory()
+    unwrapped: Any = UnwrappedHistory()
     for field in HISTORY_FIELDS:
         setattr(unwrapped, field, [])
     unwrapped.unwrapped = True
@@ -1204,9 +1205,9 @@ def history_stats(
     usage_down = 0.0
     usage_up = 0.0
 
-    rtt_full = []
-    rtt_all = []
-    rtt_buckets = [[] for _ in range(15)]
+    rtt_full: List[float] = []
+    rtt_all: List[Tuple[float, float]] = []
+    rtt_buckets: List[List[float]] = [[] for _ in range(15)]
 
     for i in sample_range:
         d = history.pop_ping_drop_rate[i]
@@ -1274,10 +1275,10 @@ def history_stats(
         accum_value += sum(x[0] for x in items)
         return accum_value / total_weight, result
 
-    bucket_samples = []
-    bucket_min = []
-    bucket_median = []
-    bucket_max = []
+    bucket_samples: List[int] = []
+    bucket_min: List[Optional[float]] = []
+    bucket_median: List[Optional[float]] = []
+    bucket_max: List[Optional[float]] = []
     for bucket in rtt_buckets:
         if bucket:
             bucket_samples.append(len(bucket))
