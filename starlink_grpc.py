@@ -143,6 +143,20 @@ their nature, but the field names are pretty self-explanatory.
 : **alert_power_supply_thermal_throttle** : Alert corresponding with bit 9 (bit
     mask 512) in *alerts*.
 
+Location data
+-------------
+This group holds information about the physical location of the user terminal.
+
+This group of fields should be considered EXPERIMENTAL, due to the requirement
+to authorize access to location data on the user terminal.
+
+: **latitude** : Latitude part of the current location, in degrees, or None if
+    location data is not available.
+: **longitude** : Longitude part of the current location, in degrees, or None if
+    location data is not available.
+: **altitude** : Altitude part of the current location, (probably) in meters, or
+    None if location data is not available.
+
 General history data
 --------------------
 This set of fields contains data relevant to all the other history groups.
@@ -414,7 +428,16 @@ ObstructionDict = TypedDict(
 
 AlertDict = Dict[str, bool]
 
-HistGeneralDict = TypedDict("HistGeneralDict", {"samples": int, "end_counter": int})
+LocationDict = TypedDict("LocationDict", {
+    "latitude": Optional[float],
+    "longitude": Optional[float],
+    "altitude": Optional[float],
+})
+
+HistGeneralDict = TypedDict("HistGeneralDict", {
+    "samples": int,
+    "end_counter": int,
+})
 
 HistBulkDict = TypedDict(
     "HistBulkDict", {
@@ -464,7 +487,10 @@ LoadedLatencyDict = TypedDict(
         "load_bucket_max_latency[]": Sequence[Optional[float]],
     })
 
-UsageDict = TypedDict("UsageDict", {"download_usage": int, "upload_usage": int})
+UsageDict = TypedDict("UsageDict", {
+    "download_usage": int,
+    "upload_usage": int,
+})
 
 # For legacy reasons, there is a slight difference between the field names
 # returned in the actual data vs the *_field_names functions. This is a map of
@@ -748,6 +774,61 @@ def status_data(
         "raw_wedges_fraction_obstructed[]": status.obstruction_stats.wedge_fraction_obstructed,
         "valid_s": status.obstruction_stats.valid_s,
     }, alerts
+
+
+def get_location(context: Optional[ChannelContext] = None):
+    """Fetch location data and return it in grpc structure format.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        grpc.RpcError: Communication or service error.
+    """
+    def grpc_call(channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(get_location={}), timeout=REQUEST_TIMEOUT)
+        return response.get_location
+
+    return call_with_channel(grpc_call, context=context)
+
+
+def location_data(context: Optional[ChannelContext] = None) -> LocationDict:
+    """Fetch current location data.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls.
+
+    Returns:
+        A dict mapping location data field names to their values. Values will
+        be set to None in the case that location request is not enabled (ie:
+        not authorized).
+
+    Raises:
+        GrpcError: Failed getting location info from the Starlink user terminal.
+    """
+    try:
+        location = get_location(context)
+    except grpc.RpcError as e:
+        if isinstance(e, grpc.Call) and e.code() is grpc.StatusCode.PERMISSION_DENIED:
+            return {
+                "latitude": None,
+                "longitude": None,
+                "altitude": None,
+            }
+        raise GrpcError(e)
+
+    return {
+        "latitude": location.lla.lat,
+        "longitude": location.lla.lon,
+        "altitude": location.lla.alt,
+    }
 
 
 def history_bulk_field_names():

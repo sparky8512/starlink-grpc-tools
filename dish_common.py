@@ -23,7 +23,7 @@ import starlink_grpc
 
 BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
 LOOP_TIME_DEFAULT = 0
-STATUS_MODES = ["status", "obstruction_detail", "alert_detail"]
+STATUS_MODES = ["status", "obstruction_detail", "alert_detail", "location"]
 HISTORY_STATS_MODES = [
     "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage"
 ]
@@ -124,7 +124,11 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
         parser.error("Poll loops arg must be 2 or greater to be meaningful")
 
     # for convenience, set flags for whether any mode in a group is selected
-    opts.status_mode = bool(set(STATUS_MODES).intersection(opts.mode))
+    status_set = set(STATUS_MODES)
+    opts.status_mode = bool(status_set.intersection(opts.mode))
+    status_set.remove("location")
+    # special group for any status mode other than location
+    opts.pure_status_mode = bool(status_set.intersection(opts.mode))
     opts.history_stats_mode = bool(set(HISTORY_STATS_MODES).intersection(opts.mode))
     opts.bulk_mode = "bulk_history" in opts.mode
 
@@ -167,6 +171,7 @@ class GlobalState:
         self.poll_count = 0
         self.accum_history = None
         self.first_poll = True
+        self.warn_once_location = True
 
     def shutdown(self):
         self.context.close()
@@ -252,30 +257,41 @@ def add_data_numeric(data, category, add_item, add_sequence):
 def get_status_data(opts, gstate, add_item, add_sequence):
     if opts.status_mode:
         timestamp = int(time.time())
-        try:
-            groups = starlink_grpc.status_data(context=gstate.context)
-            status_data, obstruct_detail, alert_detail = groups[0:3]
-        except starlink_grpc.GrpcError as e:
-            if "status" in opts.mode:
-                if opts.need_id and gstate.dish_id is None:
-                    conn_error(opts, "Dish unreachable and ID unknown, so not recording state")
-                    return 1, None
-                if opts.verbose:
-                    print("Dish unreachable")
-                add_item("state", "DISH_UNREACHABLE", "status")
-                return 0, timestamp
-            conn_error(opts, "Failure getting status: %s", str(e))
-            return 1, None
-        if opts.need_id:
-            gstate.dish_id = status_data["id"]
-            del status_data["id"]
         add_data = add_data_numeric if opts.numeric else add_data_normal
-        if "status" in opts.mode:
-            add_data(status_data, "status", add_item, add_sequence)
-        if "obstruction_detail" in opts.mode:
-            add_data(obstruct_detail, "status", add_item, add_sequence)
-        if "alert_detail" in opts.mode:
-            add_data(alert_detail, "status", add_item, add_sequence)
+        if opts.pure_status_mode or opts.need_id and gstate.dish_id is None:
+            try:
+                groups = starlink_grpc.status_data(context=gstate.context)
+                status_data, obstruct_detail, alert_detail = groups[0:3]
+            except starlink_grpc.GrpcError as e:
+                if "status" in opts.mode:
+                    if opts.need_id and gstate.dish_id is None:
+                        conn_error(opts, "Dish unreachable and ID unknown, so not recording state")
+                        return 1, None
+                    if opts.verbose:
+                        print("Dish unreachable")
+                    add_item("state", "DISH_UNREACHABLE", "status")
+                    return 0, timestamp
+                conn_error(opts, "Failure getting status: %s", str(e))
+                return 1, None
+            if opts.need_id:
+                gstate.dish_id = status_data["id"]
+                del status_data["id"]
+            if "status" in opts.mode:
+                add_data(status_data, "status", add_item, add_sequence)
+            if "obstruction_detail" in opts.mode:
+                add_data(obstruct_detail, "status", add_item, add_sequence)
+            if "alert_detail" in opts.mode:
+                add_data(alert_detail, "status", add_item, add_sequence)
+        if "location" in opts.mode:
+            try:
+                location = starlink_grpc.location_data(context=gstate.context)
+            except starlink_grpc.GrpcError as e:
+                conn_error(opts, "Failure getting location: %s", str(e))
+                return 1, None
+            if location["latitude"] is None and gstate.warn_once_location:
+                logging.warning("Location data not enabled. See README for more details.")
+                gstate.warn_once_location = False
+            add_data(location, "status", add_item, add_sequence)
         return 0, timestamp
     elif opts.need_id and gstate.dish_id is None:
         try:
