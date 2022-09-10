@@ -128,18 +128,21 @@ def print_header(opts, print_file):
                 header.append(name)
 
     if opts.status_mode:
-        context = starlink_grpc.ChannelContext(target=opts.target)
-        try:
-            name_groups = starlink_grpc.status_field_names(context=context)
-        except starlink_grpc.GrpcError as e:
-            dish_common.conn_error(opts, "Failure reflecting status field names: %s", str(e))
-            return 1
-        if "status" in opts.mode:
-            header_add(name_groups[0])
-        if "obstruction_detail" in opts.mode:
-            header_add(name_groups[1])
-        if "alert_detail" in opts.mode:
-            header_add(name_groups[2])
+        if opts.pure_status_mode:
+            context = starlink_grpc.ChannelContext(target=opts.target)
+            try:
+                name_groups = starlink_grpc.status_field_names(context=context)
+            except starlink_grpc.GrpcError as e:
+                dish_common.conn_error(opts, "Failure reflecting status field names: %s", str(e))
+                return 1
+            if "status" in opts.mode:
+                header_add(name_groups[0])
+            if "obstruction_detail" in opts.mode:
+                header_add(name_groups[1])
+            if "alert_detail" in opts.mode:
+                header_add(name_groups[2])
+        if "location" in opts.mode:
+            header_add(starlink_grpc.location_field_names())
 
     if opts.bulk_mode:
         general, bulk = starlink_grpc.history_bulk_field_names()
@@ -153,10 +156,10 @@ def print_header(opts, print_file):
             header_add(ping)
         if "ping_run_length" in opts.mode:
             header_add(runlen)
-        if "ping_loaded_latency" in opts.mode:
-            header_add(loaded)
         if "ping_latency" in opts.mode:
             header_add(latency)
+        if "ping_loaded_latency" in opts.mode:
+            header_add(loaded)
         if "usage" in opts.mode:
             header_add(usage)
 

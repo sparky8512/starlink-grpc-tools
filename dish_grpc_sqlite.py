@@ -46,7 +46,7 @@ import time
 import dish_common
 import starlink_grpc
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 class Terminated(Exception):
@@ -208,8 +208,10 @@ def ensure_schema(opts, conn, context):
 
 def create_tables(conn, context, suffix):
     tables = {}
-    name_groups = starlink_grpc.status_field_names(context=context)
-    type_groups = starlink_grpc.status_field_types(context=context)
+    name_groups = (starlink_grpc.status_field_names(context=context) +
+                   (starlink_grpc.location_field_names(),))
+    type_groups = (starlink_grpc.status_field_types(context=context) +
+                   (starlink_grpc.location_field_types(),))
     tables["status"] = zip(name_groups, type_groups)
 
     name_groups = starlink_grpc.history_stats_field_names()

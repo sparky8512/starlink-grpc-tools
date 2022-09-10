@@ -776,6 +776,26 @@ def status_data(
     }, alerts
 
 
+def location_field_names():
+    """Return the field names of the location data.
+
+    Returns:
+        A list with location data field names.
+    """
+    return _field_names(LocationDict)
+
+
+def location_field_types():
+    """Return the field types of the location data.
+
+    Return the type classes for each field.
+
+    Returns:
+        A list with location data field types.
+    """
+    return _field_types(LocationDict)
+
+
 def get_location(context: Optional[ChannelContext] = None):
     """Fetch location data and return it in grpc structure format.
 
