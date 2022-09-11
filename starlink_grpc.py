@@ -363,17 +363,8 @@ from itertools import chain
 import math
 import statistics
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, get_type_hints
-try:
-    from typing import TypedDict, get_args
-except ImportError:
-    # Python 3.7 does not have TypedDict, so fake it so the run time still
-    # works, even though static type checker probably will not.
-    def TypedDict(name, types):  # pylint: disable=invalid-name
-        return type(name, (dict,), {"__annotations__": types})
-
-    def get_args(tp: Any) -> Tuple[Any, ...]:
-        return tp.__args__
-
+from typing_extensions import TypedDict, get_args
+from xmlrpc.client import Boolean
 
 import grpc
 
@@ -549,7 +540,10 @@ class GrpcError(Exception):
 
 
 class UnwrappedHistory:
-    """Empty class for holding a copy of grpc history data."""
+    """Class for holding a copy of grpc history data."""
+
+    unwrapped: bool
+    current: Any
 
 
 class ChannelContext:
@@ -1031,7 +1025,7 @@ def concatenate_history(history1, history2, samples1: int = -1, start1: Optional
             print("WARNING: Appending discontiguous samples. Polling interval probably too short.")
         new_samples = size2
 
-    unwrapped: Any = UnwrappedHistory()
+    unwrapped = UnwrappedHistory()
     for field in HISTORY_FIELDS:
         setattr(unwrapped, field, [])
     unwrapped.unwrapped = True

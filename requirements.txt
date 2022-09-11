@@ -6,3 +6,4 @@ paho-mqtt>=1.5.1
 influxdb>=5.3.1
 influxdb_client>=1.23.0
 pypng>=0.0.20
+typing-extensions>=4.3.0
