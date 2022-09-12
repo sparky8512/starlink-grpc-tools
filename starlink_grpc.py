@@ -362,7 +362,7 @@ period.
 from itertools import chain
 import math
 import statistics
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, get_type_hints
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple, get_type_hints
 from typing_extensions import TypedDict, get_args
 
 import grpc
@@ -542,7 +542,6 @@ class UnwrappedHistory:
     """Class for holding a copy of grpc history data."""
 
     unwrapped: bool
-    current: Any
 
 
 class ChannelContext:
