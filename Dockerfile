@@ -12,7 +12,7 @@ pip3 install \
         six==1.15.0 msgpack==1.0.2 \
     influxdb_client==1.24.0 rx==3.2.0 \
     yagrc==1.1.1 grpcio-reflection==1.36.1 protobuf==3.15.6 \
-    typing-extensions>=4.3.0
+    typing-extensions==4.3.0
 
 ADD . /app
 WORKDIR /app
