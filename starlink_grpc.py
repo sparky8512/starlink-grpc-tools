@@ -613,7 +613,7 @@ def status_field_names(context: Optional[ChannelContext] = None):
         try:
             call_with_channel(resolve_imports, context=context)
         except grpc.RpcError as e:
-            raise GrpcError(e)
+            raise GrpcError(e) from e
     alert_names = []
     for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
         alert_names.append("alert_" + field.name)
@@ -643,7 +643,7 @@ def status_field_types(context: Optional[ChannelContext] = None):
         try:
             call_with_channel(resolve_imports, context=context)
         except grpc.RpcError as e:
-            raise GrpcError(e)
+            raise GrpcError(e) from e
     return (_field_types(StatusDict), _field_types(ObstructionDict),
             [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields))
 
@@ -688,7 +688,7 @@ def get_id(context: Optional[ChannelContext] = None) -> str:
         status = get_status(context)
         return status.device_info.id
     except grpc.RpcError as e:
-        raise GrpcError(e)
+        raise GrpcError(e) from e
 
 
 def status_data(
@@ -710,7 +710,7 @@ def status_data(
     try:
         status = get_status(context)
     except grpc.RpcError as e:
-        raise GrpcError(e)
+        raise GrpcError(e) from e
 
     if status.HasField("outage"):
         if status.outage.cause == dish_pb2.DishOutage.Cause.NO_SCHEDULE:
@@ -732,8 +732,8 @@ def status_data(
         if field.number < 65:
             alert_bits |= (1 if value else 0) << (field.number - 1)
 
-    if (status.obstruction_stats.avg_prolonged_obstruction_duration_s > 0.0 and not
-        math.isnan(status.obstruction_stats.avg_prolonged_obstruction_interval_s)):
+    if (status.obstruction_stats.avg_prolonged_obstruction_duration_s > 0.0
+            and not math.isnan(status.obstruction_stats.avg_prolonged_obstruction_interval_s)):
         obstruction_duration = status.obstruction_stats.avg_prolonged_obstruction_duration_s
         obstruction_interval = status.obstruction_stats.avg_prolonged_obstruction_interval_s
     else:
@@ -834,7 +834,7 @@ def location_data(context: Optional[ChannelContext] = None) -> LocationDict:
                 "longitude": None,
                 "altitude": None,
             }
-        raise GrpcError(e)
+        raise GrpcError(e) from e
 
     return {
         "latitude": location.lla.lat,
@@ -936,7 +936,10 @@ def get_history(context: Optional[ChannelContext] = None):
     return call_with_channel(grpc_call, context=context)
 
 
-def _compute_sample_range(history, parse_samples: int, start: Optional[int] = None, verbose: bool = False):
+def _compute_sample_range(history,
+                          parse_samples: int,
+                          start: Optional[int] = None,
+                          verbose: bool = False):
     current = int(history.current)
     samples = len(history.pop_ping_drop_rate)
 
@@ -984,7 +987,11 @@ def _compute_sample_range(history, parse_samples: int, start: Optional[int] = No
     return sample_range, current - start, current
 
 
-def concatenate_history(history1, history2, samples1: int = -1, start1: Optional[int] = None, verbose: bool = False):
+def concatenate_history(history1,
+                        history2,
+                        samples1: int = -1,
+                        start1: Optional[int] = None,
+                        verbose: bool = False):
     """Append the sample-dependent fields of one history object to another.
 
     Note:
@@ -1088,7 +1095,7 @@ def history_bulk_data(parse_samples: int,
         try:
             history = get_history(context)
         except grpc.RpcError as e:
-            raise GrpcError(e)
+            raise GrpcError(e) from e
 
     sample_range, parsed_samples, current = _compute_sample_range(history,
                                                                   parse_samples,
@@ -1173,7 +1180,7 @@ def history_stats(
         try:
             history = get_history(context)
         except grpc.RpcError as e:
-            raise GrpcError(e)
+            raise GrpcError(e) from e
 
     sample_range, parsed_samples, current = _compute_sample_range(history,
                                                                   parse_samples,
@@ -1364,7 +1371,7 @@ def obstruction_map(context: Optional[ChannelContext] = None):
     try:
         map_data = get_obstruction_map(context)
     except grpc.RpcError as e:
-        raise GrpcError(e)
+        raise GrpcError(e) from e
 
     cols = map_data.num_cols
     return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
@@ -1388,12 +1395,11 @@ def reboot(context: Optional[ChannelContext] = None) -> None:
         stub = device_pb2_grpc.DeviceStub(channel)
         stub.Handle(device_pb2.Request(reboot={}), timeout=REQUEST_TIMEOUT)
         # response is empty message in this case, so just ignore it
-        return None
 
     try:
         call_with_channel(grpc_call, context=context)
     except grpc.RpcError as e:
-        raise GrpcError(e)
+        raise GrpcError(e) from e
 
 
 def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = None) -> None:
@@ -1416,9 +1422,8 @@ def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = Non
         stub = device_pb2_grpc.DeviceStub(channel)
         stub.Handle(device_pb2.Request(dish_stow={"unstow": unstow}), timeout=REQUEST_TIMEOUT)
         # response is empty message in this case, so just ignore it
-        return None
 
     try:
         call_with_channel(grpc_call, context=context)
     except grpc.RpcError as e:
-        raise GrpcError(e)
+        raise GrpcError(e) from e

@@ -103,9 +103,8 @@ def loop_body(opts):
         print("Protoset:", filename)
     else:
         try:
-            outfile = open(filename, mode="xb")
-            outfile.write(protoset)
-            outfile.close()
+            with open(filename, mode="xb") as outfile:
+                outfile.write(protoset)
             print("New protoset found:", filename)
         except FileExistsError:
             if opts.verbose:
@@ -139,5 +138,5 @@ def main():
             break
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

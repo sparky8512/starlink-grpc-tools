@@ -143,7 +143,7 @@ def loop_body(opts, gstate):
                 data["dish_{0}".format(category)] = {}
 
             # Skip NaN values that occur on startup because they can upset Javascript JSON parsers
-            if not ((type(val) == float) and math.isnan(val)):
+            if not (isinstance(val, float) and math.isnan(val)):
                 data["dish_{0}".format(category)].update({key: val})
 
         def cb_add_sequence(key, val, category, _):
@@ -207,5 +207,5 @@ def main():
     sys.exit(rc)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

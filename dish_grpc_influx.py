@@ -260,8 +260,8 @@ def loop_body(opts, gstate, shutdown=False):
     if rc:
         return rc
 
-    for category in fields:
-        if fields[category]:
+    for category, cat_fields in fields.items():
+        if cat_fields:
             timestamp = status_ts if category == "status" else hist_ts
             gstate.points.append({
                 "measurement": "spacex.starlink.user_terminal." + category,
@@ -269,7 +269,7 @@ def loop_body(opts, gstate, shutdown=False):
                     "id": gstate.dish_id
                 },
                 "time": timestamp,
-                "fields": fields[category],
+                "fields": cat_fields,
             })
 
     # This is here and not before the points being processed because if the
@@ -334,5 +334,5 @@ def main():
     sys.exit(rc)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

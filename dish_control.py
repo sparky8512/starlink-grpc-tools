@@ -37,7 +37,8 @@ def main():
             else:  # unstow
                 request = request_class(dish_stow={"unstow": True})
             stub = reflector.service_stub_class("SpaceX.API.Device.Device")(channel)
-            response = stub.Handle(request, timeout=10)
+            stub.Handle(request, timeout=10)
+            # response is just empty message, so ignore it
     except grpc.RpcError as e:
         if isinstance(e, grpc.Call):
             msg = e.details()
@@ -49,5 +50,5 @@ def main():
     sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

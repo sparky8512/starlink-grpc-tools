@@ -270,7 +270,7 @@ def convert_tables(conn, context):
             ",".join(repeat("?", len(new_columns))))
         new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
         new_cur.execute('DROP TABLE "{0}"'.format(table))
-        new_cur.execute('ALTER TABLE {0}_new RENAME TO {0}'.format(table))
+        new_cur.execute('ALTER TABLE "{0}_new" RENAME TO "{0}"'.format(table))
     old_cur.close()
     new_cur.close()
     conn.row_factory = None
@@ -315,5 +315,5 @@ def main():
     sys.exit(rc)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

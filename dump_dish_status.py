@@ -8,10 +8,8 @@ import grpc
 try:
     from spacex.api.device import device_pb2
     from spacex.api.device import device_pb2_grpc
-    from spacex.api.device import dish_pb2
 except ModuleNotFoundError:
-    print("This script requires the generated gRPC protocol modules. "
-          "See README file for details.",
+    print("This script requires the generated gRPC protocol modules. See README file for details.",
           file=sys.stderr)
     sys.exit(1)
 

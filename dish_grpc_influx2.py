@@ -51,7 +51,8 @@ def handle_sigterm(signum, frame):
 
 
 def parse_args():
-    parser = dish_common.create_arg_parser(output_description="write it to an InfluxDB 2.x database")
+    parser = dish_common.create_arg_parser(
+        output_description="write it to an InfluxDB 2.x database")
 
     group = parser.add_argument_group(title="InfluxDB 2.x database options")
     group.add_argument("-u",
@@ -111,7 +112,8 @@ def parse_args():
         if val is not None:
             opts.icargs[key] = val
 
-    if (not opts.verify_ssl or opts.ssl_ca_cert is not None) and not opts.url.lower().startswith("https:"):
+    if (not opts.verify_ssl
+            or opts.ssl_ca_cert is not None) and not opts.url.lower().startswith("https:"):
         parser.error("SSL options only apply to HTTPS URLs")
 
     return opts
@@ -119,21 +121,26 @@ def parse_args():
 
 def flush_points(opts, gstate):
     try:
-        write_api = gstate.influx_client.write_api(write_options=WriteOptions(batch_size=len(gstate.points),
-                                                                              flush_interval=10_000,
-                                                                              jitter_interval=2_000,
-                                                                              retry_interval=5_000,
-                                                                              max_retries=5,
-                                                                              max_retry_delay=30_000,
-                                                                              exponential_base=2))
+        write_api = gstate.influx_client.write_api(
+            write_options=WriteOptions(batch_size=len(gstate.points),
+                                       flush_interval=10_000,
+                                       jitter_interval=2_000,
+                                       retry_interval=5_000,
+                                       max_retries=5,
+                                       max_retry_delay=30_000,
+                                       exponential_base=2))
         while len(gstate.points) > MAX_BATCH:
-            write_api.write(record=gstate.points[:MAX_BATCH], write_precision=WritePrecision.S, bucket=opts.bucket)
+            write_api.write(record=gstate.points[:MAX_BATCH],
+                            write_precision=WritePrecision.S,
+                            bucket=opts.bucket)
             if opts.verbose:
                 print("Data points written: " + str(MAX_BATCH))
             del gstate.points[:MAX_BATCH]
 
         if gstate.points:
-            write_api.write(record=gstate.points, write_precision=WritePrecision.S, bucket=opts.bucket)
+            write_api.write(record=gstate.points,
+                            write_precision=WritePrecision.S,
+                            bucket=opts.bucket)
             if opts.verbose:
                 print("Data points written: " + str(len(gstate.points)))
             gstate.points.clear()
@@ -161,11 +168,10 @@ def query_counter(opts, gstate, start, end):
         |> filter(fn: (r) => r["_field"] == "counter")
         |> last()
         |> yield(name: "last")
-        '''.format(opts.bucket, str(start), str(end), BULK_MEASUREMENT)
-    )
+        '''.format(opts.bucket, str(start), str(end), BULK_MEASUREMENT))
     if result:
-        counter = result[0].records[0]['_value']
-        timestamp = result[0].records[0]['_time'].timestamp()
+        counter = result[0].records[0]["_value"]
+        timestamp = result[0].records[0]["_time"].timestamp()
         if counter and timestamp:
             return int(counter), int(timestamp)
 
@@ -174,7 +180,8 @@ def query_counter(opts, gstate, start, end):
 
 def sync_timebase(opts, gstate):
     try:
-        db_counter, db_timestamp = query_counter(opts, gstate, gstate.start_timestamp, gstate.timestamp)
+        db_counter, db_timestamp = query_counter(opts, gstate, gstate.start_timestamp,
+                                                 gstate.timestamp)
     except Exception as e:
         # could be temporary outage, so try again next time
         dish_common.conn_error(opts, "Failed querying InfluxDB for prior count: %s", str(e))
@@ -250,8 +257,8 @@ def loop_body(opts, gstate, shutdown=False):
     if rc:
         return rc
 
-    for category in fields:
-        if fields[category]:
+    for category, cat_fields in fields.items():
+        if cat_fields:
             timestamp = status_ts if category == "status" else hist_ts
             gstate.points.append({
                 "measurement": "spacex.starlink.user_terminal." + category,
@@ -259,7 +266,7 @@ def loop_body(opts, gstate, shutdown=False):
                     "id": gstate.dish_id
                 },
                 "time": timestamp,
-                "fields": fields[category],
+                "fields": cat_fields,
             })
 
     # This is here and not before the points being processed because if the
@@ -319,5 +326,5 @@ def main():
     sys.exit(rc)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
