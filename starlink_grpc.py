@@ -101,11 +101,13 @@ terminal has determined to be obstructed.
     30 degrees East of North, and subsequent wedges rotate 30 degrees further
     in the same direction. (It's not clear if this will hold true at all
     latitudes.)
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **raw_wedges_fraction_obstructed** : A 12 element sequence. Wedges
     presumably correlate with the ones in *wedges_fraction_obstructed*, but
     the exact relationship is unknown. The numbers in this one are generally
     higher and may represent fraction of the wedge, in which case max value
     for each element should be 1.
+    **OBSOLETE**: The user terminal no longer provides this data.
 : **valid_s** : It is unclear what this field means exactly, but it appears to
     be a measure of how complete the data is that the user terminal uses to
     determine obstruction locations.
@@ -411,8 +413,8 @@ StatusDict = TypedDict(
 
 ObstructionDict = TypedDict(
     "ObstructionDict", {
-        "wedges_fraction_obstructed[]": Sequence[float],
-        "raw_wedges_fraction_obstructed[]": Sequence[float],
+        "wedges_fraction_obstructed[]": Sequence[Optional[float]],
+        "raw_wedges_fraction_obstructed[]": Sequence[Optional[float]],
         "valid_s": float,
     })
 
@@ -762,8 +764,8 @@ def status_data(
         "direction_elevation": status.boresight_elevation_deg,
         "is_snr_above_noise_floor": status.is_snr_above_noise_floor,
     }, {
-        "wedges_fraction_obstructed[]": status.obstruction_stats.wedge_abs_fraction_obstructed,
-        "raw_wedges_fraction_obstructed[]": status.obstruction_stats.wedge_fraction_obstructed,
+        "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
+        "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "valid_s": status.obstruction_stats.valid_s,
     }, alerts
 
