@@ -175,10 +175,10 @@ Commands here should work for debian / ubuntu based distribution
 ```shell
 sudo apt instlall python3-venv
 cd /opt/
-sudo mkdir starlink-grpc-tool
+sudo mkdir starlink-grpc-tools
 sudo chown <your non-root user>
 git clone <git url>
-cd starlink-grpc-tool
+cd starlink-grpc-tools
 python3 -m venv venv
 source venv/bin/activate.sh
 pip3 install -r requirements.txt
