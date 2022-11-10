@@ -182,7 +182,7 @@ cd starlink-grpc-tools
 python3 -m venv venv
 source venv/bin/activate.sh
 pip3 install -r requirements.txt
-sudo cp systemd/starlink-influx2.service /etc/systemd/starlink-influx2.service
+sudo cp systemd/starlink-influx2.service /etc/systemd/system/starlink-influx2.service
 sudo <your favorite editor> /etc/systemd/system/starlink-influx2.service
 # Set influx url, token, bucket and org
 sudo systemctl enable starlink-influx2
