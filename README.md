@@ -38,9 +38,12 @@ Of the 3 groups below, the grpc scripts are really the only ones being actively 
 
 ### The grpc scripts
 
-This set of scripts includes `dish_grpc_text.py`, `dish_grpc_influx.py`, `dish_grpc_influx2.py`, `dish_grpc_sqlite.py`, and `dish_grpc_mqtt.py`. They mostly support the same functionality, but write their output in different ways. `dish_grpc_text.py` writes data to standard output, `dish_grpc_influx.py` and `dish_grpc_influx2.py` send it to an InfluxDB 1.x and 2.x server, respectively, `dish_grpc_sqlite.py` writes it to a sqlite database, and `dish_grpc_mqtt.py` sends it to a MQTT broker.
+This set of scripts includes `dish_grpc_text.py`, `dish_grpc_influx.py`, `dish_grpc_influx2.py`, `dish_grpc_sqlite.py`, `dish_grpc_mqtt.py`, and `dish_grpc_prometheus.py`. They mostly support the same functionality, but write their output in different ways. `dish_grpc_text.py` writes data to standard output, `dish_grpc_influx.py` and `dish_grpc_influx2.py` send it to an InfluxDB 1.x and 2.x server, respectively, `dish_grpc_sqlite.py` writes it to a sqlite database, and `dish_grpc_mqtt.py` sends it to a MQTT broker. `dish_grpc_prometheus.py` does not write anywhere but will listen for HTTP requests and
+return data in a format Prometheus can scrape.
 
 All these scripts support processing status data and/or history data in various modes. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app, whereas most of the data displayed in the Statistics page of the Starlink app comes from the history data. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
+
+`dish_grpc_prometheus.py` has only been tested with the modes `status`, `usage`, and `alert_detail`.
 
 For example, data from all the currently available status groups can be output by doing:
 ```shell script
