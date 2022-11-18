@@ -30,7 +30,6 @@ class MetricInfo:
 
 METRICS_INFO = {
     "status_uptime": MetricInfo(unit="seconds", kind="counter"),
-    "status_snr": MetricInfo(),
     "status_seconds_to_first_nonempty_slot": MetricInfo(),
     "status_pop_ping_drop_rate": MetricInfo(),
     "status_downlink_throughput_bps": MetricInfo(),
@@ -161,6 +160,11 @@ def prometheus_export():
     )
 
     metrics = []
+
+    # snr is not supported by starlink any more but still returned by the grpc
+    # service for backwards compatibility
+    if "status_snr" in raw_data:
+        del raw_data["status_snr"]
 
     metrics.append(
         Metric(
