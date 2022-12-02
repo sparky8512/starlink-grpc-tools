@@ -13,11 +13,25 @@ except ModuleNotFoundError:
           file=sys.stderr)
     sys.exit(1)
 
+def wrap_ser(self, **kwargs):
+    ret = device_pb2.Request.SerializeToString(self, **kwargs)
+    print("request:", ret)
+    return ret
+
+def wrap_des(s):
+    print("response:", s)
+    #return "Hello"
+    return device_pb2.Response.FromString(s)
+
 # Note that if you remove the 'with' clause here, you need to separately
 # call channel.close() when you're done with the gRPC connection.
 with grpc.insecure_channel("192.168.100.1:9200") as channel:
-    stub = device_pb2_grpc.DeviceStub(channel)
-    response = stub.Handle(device_pb2.Request(get_status={}), timeout=10)
+    method = channel.unary_unary('/SpaceX.API.Device.Device/Handle',
+            request_serializer=wrap_ser,
+            response_deserializer=None
+            #response_deserializer=wrap_des
+            )
+    response = method(device_pb2.Request(get_status={}), timeout=10)
 
 # Dump everything
 print(response)

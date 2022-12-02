@@ -2,15 +2,26 @@
 """Prometheus exporter for Starlink user terminal data info.
 
 This script pulls the current status info and/or metrics computed from the
-history data and makes it available via HTTP in the format Prometeus expects.
+history data and makes it available via HTTP in the format Prometheus expects.
 """
 
-import logging
-import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import logging
+import signal
+import sys
+import threading
 
 import dish_common
+
+
+class Terminated(Exception):
+    pass
+
+
+def handle_sigterm(signum, frame):
+    # Turn SIGTERM into an exception so main loop can clean up
+    raise Terminated
 
 
 class MetricInfo:
@@ -125,13 +136,7 @@ class MetricValue:
         return f"{label_str} {self.value}"
 
 
-opts = None
-gstate = None
-
-
 def parse_args():
-    global opts
-
     parser = dish_common.create_arg_parser(
         output_description="Prometheus exporter", bulk_history=False
     )
@@ -140,12 +145,10 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    opts = dish_common.run_arg_parser(parser)
+    return dish_common.run_arg_parser(parser)
 
 
-def prometheus_export():
-    global opts, gstate
-
+def prometheus_export(opts, gstate):
     raw_data = {}
 
     def data_add_item(name, value, category):
@@ -243,7 +246,16 @@ def prometheus_export():
 
 class MetricsRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        content = prometheus_export()
+        path = self.path.partition("?")[0]
+        if path != "/":
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+
+        opts = self.server.opts
+        gstate = self.server.gstate
+
+        with gstate.lock:
+            content = prometheus_export(opts, gstate)
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-type", "text/plain")
         self.send_header("Content-Length", len(content))
@@ -252,16 +264,28 @@ class MetricsRequestHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    global opts, gstate
-
-    parse_args()
+    opts = parse_args()
 
     logging.basicConfig(format="%(levelname)s: %(message)s", stream=sys.stderr)
 
     gstate = dish_common.GlobalState(target=opts.target)
+    gstate.lock = threading.Lock()
 
     httpd = ThreadingHTTPServer((opts.address, opts.port), MetricsRequestHandler)
-    httpd.serve_forever()
+    httpd.daemon_threads = False
+    httpd.opts = opts
+    httpd.gstate = gstate
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
+
+    print("HTTP listening on port", opts.port)
+    try:
+        httpd.serve_forever()
+    except (KeyboardInterrupt, Terminated):
+        pass
+    finally:
+        httpd.server_close()
+        httpd.gstate.shutdown()
 
     sys.exit()
 

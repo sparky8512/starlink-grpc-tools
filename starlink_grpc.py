@@ -719,7 +719,12 @@ def status_data(
             # Special case translate this to equivalent old name
             state = "SEARCHING"
         else:
-            state = dish_pb2.DishOutage.Cause.Name(status.outage.cause)
+            try:
+                state = dish_pb2.DishOutage.Cause.Name(status.outage.cause)
+            except ValueError:
+                # Unlikely, but possible if dish is running newer firmware
+                # than protocol data pulled via reflection
+                state = str(status.outage.cause)
     else:
         state = "CONNECTED"
 
