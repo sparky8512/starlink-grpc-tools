@@ -11,7 +11,6 @@ pip3 install \
         urllib3==1.26.12 \
     influxdb-client==1.34.0 reactivex==4.0.4 \
     paho-mqtt==1.6.1 \
-    pypng==0.20220715.0 \
     typing_extensions==4.4.0 \
     yagrc==1.1.1 grpcio-reflection==1.50.0 protobuf==4.21.9
 
