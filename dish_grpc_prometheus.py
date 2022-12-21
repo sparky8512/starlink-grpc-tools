@@ -128,18 +128,14 @@ class MetricValue:
     def __str__(self):
         label_str = ""
         if self.labels:
-            label_str = (
-                "{"
-                + str.join(",", [f'{v[0]}="{v[1]}"' for v in self.labels.items()])
-                + "}"
-            )
+            label_str = ("{" + str.join(",", [f'{v[0]}="{v[1]}"'
+                                              for v in self.labels.items()]) + "}")
         return f"{label_str} {self.value}"
 
 
 def parse_args():
-    parser = dish_common.create_arg_parser(
-        output_description="Prometheus exporter", bulk_history=False
-    )
+    parser = dish_common.create_arg_parser(output_description="Prometheus exporter",
+                                           bulk_history=False)
 
     group = parser.add_argument_group(title="HTTP server options")
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
@@ -159,9 +155,8 @@ def prometheus_export(opts, gstate):
         raise NotImplementedError("Did not expect sequence data")
 
     with gstate.lock:
-        rc, status_ts, hist_ts = dish_common.get_data(
-            opts, gstate, data_add_item, data_add_sequencem
-        )
+        rc, status_ts, hist_ts = dish_common.get_data(opts, gstate, data_add_item,
+                                                      data_add_sequencem)
 
     metrics = []
 
@@ -178,11 +173,9 @@ def prometheus_export(opts, gstate):
                 MetricValue(
                     value=int(raw_data["status_state"] == state_value),
                     labels={"state": state_value},
-                )
-                for state_value in STATE_VALUES
+                ) for state_value in STATE_VALUES
             ],
-        )
-    )
+        ))
     del raw_data["status_state"]
 
     info_metrics = ["status_id", "status_hardware_version", "status_software_version"]
@@ -198,14 +191,12 @@ def prometheus_export(opts, gstate):
                     MetricValue(
                         value=1,
                         labels={
-                            x.replace("status_", ""): raw_data.pop(x)
-                            for x in info_metrics
+                            x.replace("status_", ""): raw_data.pop(x) for x in info_metrics
                             if x in raw_data
                         },
                     )
                 ],
-            )
-        )
+            ))
 
     for name, metric_info in METRICS_INFO.items():
         if name in raw_data:
@@ -215,8 +206,7 @@ def prometheus_export(opts, gstate):
                     timestamp=status_ts,
                     kind=metric_info.kind,
                     values=[MetricValue(value=float(raw_data.pop(name) or 0))],
-                )
-            )
+                ))
         else:
             metrics_not_found.append(name)
 
@@ -225,22 +215,17 @@ def prometheus_export(opts, gstate):
             name="starlink_exporter_unprocessed_metrics",
             timestamp=status_ts,
             values=[MetricValue(value=1, labels={"metric": name}) for name in raw_data],
-        )
-    )
+        ))
 
     metrics.append(
         Metric(
             name="starlink_exporter_missing_metrics",
             timestamp=status_ts,
-            values=[
-                MetricValue(
-                    value=1,
-                    labels={"metric": name},
-                )
-                for name in metrics_not_found
-            ],
-        )
-    )
+            values=[MetricValue(
+                value=1,
+                labels={"metric": name},
+            ) for name in metrics_not_found],
+        ))
 
     return str.join("\n", [str(metric) for metric in metrics])
 
