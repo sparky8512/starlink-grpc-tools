@@ -43,7 +43,7 @@ return data in a format Prometheus can scrape.
 
 All these scripts support processing status data and/or history data in various modes. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app, whereas most of the data displayed in the Statistics page of the Starlink app comes from the history data. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
 
-`dish_grpc_prometheus.py` has only been tested with the modes `status`, `usage`, and `alert_detail`.
+`dish_grpc_prometheus.py` only allows the modes `status`, `usage`, and `alert_detail`.
 
 For example, data from all the currently available status groups can be output by doing:
 ```shell script
@@ -52,12 +52,14 @@ python3 dish_grpc_text.py status obstruction_detail alert_detail
 
 By default, `dish_grpc_text.py` will output in CSV format. You can use the `-v` option to instead output in a (slightly) more human-readable format.
 
-By default, all of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
+By default, most of these scripts will pull data once, send it off to the specified data backend, and then exit. They can instead be made to run in a periodic loop by passing a `-t` option to specify loop interval, in seconds. For example, to capture status information to a InfluxDB server every 30 seconds, you could do something like this:
 ```shell script
 python3 dish_grpc_influx.py -t 30 [... probably other args to specify server options ...] status
 ```
 
-Some of the scripts (currently only the InfluxDB ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
+The exception to this is `dish_grpc_prometheus.py`, for which the timing interval is determined by whatever is polling the HTTP page it exports.
+
+Some of the scripts (currently only the InfluxDB and MQTT ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
 
 #### Bulk history data collection
 

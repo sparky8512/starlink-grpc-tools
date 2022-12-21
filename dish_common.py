@@ -94,7 +94,7 @@ def create_arg_parser(output_description, bulk_history=True):
     return parser
 
 
-def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
+def run_arg_parser(parser, need_id=False, no_stdout_errors=False, modes=None):
     """Run parse_args on a parser previously created with create_arg_parser
 
     Args:
@@ -104,17 +104,20 @@ def run_arg_parser(parser, need_id=False, no_stdout_errors=False):
         no_stdout_errors (bool): A flag set in options to protect stdout from
             error messages, in case that's where the data output is going, so
             may be being redirected to a file.
+        modes (list[str]): Optionally provide the subset of data group modes
+            to allow.
 
     Returns:
         An argparse Namespace object with the parsed options set as attributes.
     """
-    all_modes = STATUS_MODES + HISTORY_STATS_MODES + UNGROUPED_MODES
-    if parser.bulk_history:
-        all_modes.append("bulk_history")
+    if modes is None:
+        modes = STATUS_MODES + HISTORY_STATS_MODES + UNGROUPED_MODES
+        if parser.bulk_history:
+            modes.append("bulk_history")
     parser.add_argument("mode",
                         nargs="+",
-                        choices=all_modes,
-                        help="The data group to record, one or more of: " + ", ".join(all_modes),
+                        choices=modes,
+                        help="The data group to record, one or more of: " + ", ".join(modes),
                         metavar="mode")
 
     opts = parser.parse_args()
