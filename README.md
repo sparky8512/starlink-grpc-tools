@@ -131,13 +131,13 @@ Possibly more simple examples to come, as the other scripts have started getting
 
 ## Running with Docker
 
-The supported docker image for this project is now the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools/versions).
+The supported docker image for this project is now the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools). This is a multi-arch image built for `linux/amd64` (x64_64) and `linux/arm64` (aarch64) docker platforms.
 
 You can get the "latest" image with the following command:
 ```shell script
 docker pull ghcr.io/sparky8512/starlink-grpc-tools
 ```
-This will pull the image tagged as "latest". There should also be images for all recent tagged releases of this project, but those tend to be few and far between, so the most recent one will often be missing some important changes. See the package repository for a full list of tagged images.
+This will pull the image tagged as "latest". There should also be images for all recent tagged releases of this project, but those tend to be few and far between, so the most recent one may be missing some important changes. See the package repository for a full list of tagged images.
 
 You can run it with the following:
 ```shell script
