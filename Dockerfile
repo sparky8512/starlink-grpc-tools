@@ -3,8 +3,14 @@ LABEL maintainer="neurocis <neurocis@neurocis.me>"
 
 RUN true && \
 \
+ARCH=`uname -m`; \
+if [ "$ARCH" = "armv7l" ]; then \
+    NOBIN_OPT="--no-binary=grpcio"; \
+else \
+    NOBIN_OPT=""; \
+fi; \
 # Install python prerequisites
-pip3 install \
+pip3 install --no-cache-dir $NOBIN_OPT \
     grpcio==1.50.0 six==1.16.0 \
     influxdb==5.3.1 certifi==2022.9.24 charset-normalizer==2.1.1 idna==3.4 \
         msgpack==1.0.4 python-dateutil==2.8.2 pytz==2022.6 requests==2.28.1 \
