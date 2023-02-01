@@ -535,7 +535,7 @@ class GrpcError(Exception):
             msg = e.details()
         elif isinstance(e, grpc.RpcError):
             msg = "Unknown communication or service error"
-        elif isinstance(e, (AttributeError, ValueError)):
+        elif isinstance(e, (AttributeError, IndexError, TypeError, ValueError)):
             msg = "Protocol error"
         else:
             msg = str(e)
@@ -829,6 +829,9 @@ def get_location(context: Optional[ChannelContext] = None):
 
     Raises:
         grpc.RpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
     """
     def grpc_call(channel):
         if imports_pending:
@@ -857,7 +860,7 @@ def location_data(context: Optional[ChannelContext] = None) -> LocationDict:
     """
     try:
         location = get_location(context)
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         if isinstance(e, grpc.Call) and e.code() is grpc.StatusCode.PERMISSION_DENIED:
             return {
                 "latitude": None,
@@ -866,11 +869,17 @@ def location_data(context: Optional[ChannelContext] = None) -> LocationDict:
             }
         raise GrpcError(e) from e
 
-    return {
-        "latitude": location.lla.lat,
-        "longitude": location.lla.lon,
-        "altitude": location.lla.alt,
-    }
+    try:
+        return {
+            "latitude": location.lla.lat,
+            "longitude": location.lla.lon,
+            "altitude": getattr(location.lla, "alt", None),
+        }
+    except AttributeError as e:
+        # Allow None for altitude, but since all None values has special
+        # meaning for this function, any other protocol change is flagged as
+        # an error.
+        raise GrpcError(e) from e
 
 
 def history_bulk_field_names():
@@ -1424,6 +1433,9 @@ def get_obstruction_map(context: Optional[ChannelContext] = None):
 
     Raises:
         grpc.RpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
     """
     def grpc_call(channel: grpc.Channel):
         if imports_pending:
@@ -1450,15 +1462,19 @@ def obstruction_map(context: Optional[ChannelContext] = None):
         representation the SNR data instead, see `get_obstruction_map`.
 
     Raises:
-        GrpcError: Failed getting status info from the Starlink user terminal.
+        GrpcError: Failed getting obstruction data from the Starlink user
+            terminal.
     """
     try:
         map_data = get_obstruction_map(context)
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
 
-    cols = map_data.num_cols
-    return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
+    try:
+        cols = map_data.num_cols
+        return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
+    except (AttributeError, IndexError, TypeError) as e:
+        raise GrpcError(e) from e
 
 
 def reboot(context: Optional[ChannelContext] = None) -> None:
@@ -1482,7 +1498,7 @@ def reboot(context: Optional[ChannelContext] = None) -> None:
 
     try:
         call_with_channel(grpc_call, context=context)
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
 
 
@@ -1509,5 +1525,5 @@ def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = Non
 
     try:
         call_with_channel(grpc_call, context=context)
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
