@@ -955,6 +955,9 @@ def get_history(context: Optional[ChannelContext] = None):
 
     Raises:
         grpc.RpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
     """
     def grpc_call(channel: grpc.Channel):
         if imports_pending:
@@ -970,8 +973,12 @@ def _compute_sample_range(history,
                           parse_samples: int,
                           start: Optional[int] = None,
                           verbose: bool = False):
-    current = int(history.current)
-    samples = len(history.pop_ping_drop_rate)
+    try:
+        current = int(history.current)
+        samples = len(history.pop_ping_drop_rate)
+    except (AttributeError, TypeError):
+        # Without current and pop_ping_drop_rate, history is unusable.
+        return range(0), 0, None
 
     if verbose:
         print("current counter:       " + str(current))
@@ -1046,8 +1053,14 @@ def concatenate_history(history1,
         An object with the unwrapped history data and the same attribute
         fields as a grpc history object.
     """
-    size2 = len(history2.pop_ping_drop_rate)
-    new_samples = history2.current - history1.current
+    try:
+        size2 = len(history2.pop_ping_drop_rate)
+        new_samples = history2.current - history1.current
+    except (AttributeError, TypeError):
+        # Something is wrong. Probably both history objects are bad, so no
+        # point in trying to combine them.
+        return history1
+
     if new_samples < 0:
         if verbose:
             print("Dish reboot detected. Appending anyway.")
@@ -1062,19 +1075,28 @@ def concatenate_history(history1,
 
     unwrapped = UnwrappedHistory()
     for field in HISTORY_FIELDS:
-        setattr(unwrapped, field, [])
+        if hasattr(history1, field) and hasattr(history2, field):
+            setattr(unwrapped, field, [])
     unwrapped.unwrapped = True
 
     sample_range, ignore1, ignore2 = _compute_sample_range(  # pylint: disable=unused-variable
         history1, samples1, start=start1)
     for i in sample_range:
         for field in HISTORY_FIELDS:
-            getattr(unwrapped, field).append(getattr(history1, field)[i])
+            if hasattr(unwrapped, field):
+                try:
+                    getattr(unwrapped, field).append(getattr(history1, field)[i])
+                except (IndexError, TypeError):
+                    pass
 
     sample_range, ignore1, ignore2 = _compute_sample_range(history2, new_samples)  # pylint: disable=unused-variable
     for i in sample_range:
         for field in HISTORY_FIELDS:
-            getattr(unwrapped, field).append(getattr(history2, field)[i])
+            if hasattr(unwrapped, field):
+                try:
+                    getattr(unwrapped, field).append(getattr(history2, field)[i])
+                except (IndexError, TypeError):
+                    pass
 
     unwrapped.current = history2.current
     return unwrapped
@@ -1124,7 +1146,7 @@ def history_bulk_data(parse_samples: int,
     if history is None:
         try:
             history = get_history(context)
-        except grpc.RpcError as e:
+        except (AttributeError, ValueError, grpc.RpcError) as e:
             raise GrpcError(e) from e
 
     sample_range, parsed_samples, current = _compute_sample_range(history,
@@ -1138,11 +1160,30 @@ def history_bulk_data(parse_samples: int,
     uplink_throughput_bps = []
 
     for i in sample_range:
+        # pop_ping_drop_rate is checked in _compute_sample_range
         pop_ping_drop_rate.append(history.pop_ping_drop_rate[i])
-        pop_ping_latency_ms.append(
-            history.pop_ping_latency_ms[i] if history.pop_ping_drop_rate[i] < 1 else None)
-        downlink_throughput_bps.append(history.downlink_throughput_bps[i])
-        uplink_throughput_bps.append(history.uplink_throughput_bps[i])
+
+        latency = None
+        try:
+            if history.pop_ping_drop_rate[i] < 1:
+                latency = history.pop_ping_latency_ms[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        pop_ping_latency_ms.append(latency)
+
+        downlink = None
+        try:
+            downlink = history.downlink_throughput_bps[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        downlink_throughput_bps.append(downlink)
+
+        uplink = None
+        try:
+            uplink = history.uplink_throughput_bps[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        uplink_throughput_bps.append(uplink)
 
     return {
         "samples": parsed_samples,
@@ -1209,7 +1250,7 @@ def history_stats(
     if history is None:
         try:
             history = get_history(context)
-        except grpc.RpcError as e:
+        except (AttributeError, ValueError, grpc.RpcError) as e:
             raise GrpcError(e) from e
 
     sample_range, parsed_samples, current = _compute_sample_range(history,
@@ -1258,12 +1299,25 @@ def history_stats(
             init_run_length = 0
         tot += d
 
-        down = history.downlink_throughput_bps[i]
+        down = 0.0
+        try:
+            down = history.downlink_throughput_bps[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
         usage_down += down
-        up = history.uplink_throughput_bps[i]
+
+        up = 0.0
+        try:
+            up = history.uplink_throughput_bps[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
         usage_up += up
 
-        rtt = history.pop_ping_latency_ms[i]
+        rtt = 0.0
+        try:
+            rtt = history.pop_ping_latency_ms[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
         # note that "full" here means the opposite of ping drop full
         if d == 0.0:
             rtt_full.append(rtt)
