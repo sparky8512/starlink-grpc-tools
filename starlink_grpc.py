@@ -535,6 +535,8 @@ class GrpcError(Exception):
             msg = e.details()
         elif isinstance(e, grpc.RpcError):
             msg = "Unknown communication or service error"
+        elif isinstance(e, (AttributeError, ValueError)):
+            msg = "Protocol error"
         else:
             msg = str(e)
         super().__init__(msg, *args, **kwargs)
@@ -617,8 +619,11 @@ def status_field_names(context: Optional[ChannelContext] = None):
         except grpc.RpcError as e:
             raise GrpcError(e) from e
     alert_names = []
-    for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
-        alert_names.append("alert_" + field.name)
+    try:
+        for field in dish_pb2.DishAlerts.DESCRIPTOR.fields:
+            alert_names.append("alert_" + field.name)
+    except AttributeError:
+        pass
 
     return _field_names(StatusDict), _field_names(ObstructionDict), alert_names
 
@@ -646,8 +651,12 @@ def status_field_types(context: Optional[ChannelContext] = None):
             call_with_channel(resolve_imports, context=context)
         except grpc.RpcError as e:
             raise GrpcError(e) from e
-    return (_field_types(StatusDict), _field_types(ObstructionDict),
-            [bool] * len(dish_pb2.DishAlerts.DESCRIPTOR.fields))
+    num_alerts = 0
+    try:
+        num_alerts = len(dish_pb2.DishAlerts.DESCRIPTOR.fields)
+    except AttributeError:
+        pass
+    return (_field_types(StatusDict), _field_types(ObstructionDict), [bool] * num_alerts)
 
 
 def get_status(context: Optional[ChannelContext] = None):
@@ -661,6 +670,9 @@ def get_status(context: Optional[ChannelContext] = None):
 
     Raises:
         grpc.RpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
     """
     def grpc_call(channel):
         if imports_pending:
@@ -689,7 +701,7 @@ def get_id(context: Optional[ChannelContext] = None) -> str:
     try:
         status = get_status(context)
         return status.device_info.id
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
 
 
@@ -711,62 +723,78 @@ def status_data(
     """
     try:
         status = get_status(context)
-    except grpc.RpcError as e:
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
 
-    if status.HasField("outage"):
-        if status.outage.cause == dish_pb2.DishOutage.Cause.NO_SCHEDULE:
-            # Special case translate this to equivalent old name
-            state = "SEARCHING"
+    try:
+        if status.HasField("outage"):
+            if status.outage.cause == dish_pb2.DishOutage.Cause.NO_SCHEDULE:
+                # Special case translate this to equivalent old name
+                state = "SEARCHING"
+            else:
+                try:
+                    state = dish_pb2.DishOutage.Cause.Name(status.outage.cause)
+                except ValueError:
+                    # Unlikely, but possible if dish is running newer firmware
+                    # than protocol data pulled via reflection
+                    state = str(status.outage.cause)
         else:
-            state = dish_pb2.DishOutage.Cause.Name(status.outage.cause)
-    else:
-        state = "CONNECTED"
+            state = "CONNECTED"
+    except (AttributeError, ValueError):
+        state = "UNKNOWN"
 
     # More alerts may be added in future, so in addition to listing them
     # individually, provide a bit field based on field numbers of the
     # DishAlerts message.
     alerts = {}
     alert_bits = 0
-    for field in status.alerts.DESCRIPTOR.fields:
-        value = getattr(status.alerts, field.name)
-        alerts["alert_" + field.name] = value
-        if field.number < 65:
-            alert_bits |= (1 if value else 0) << (field.number - 1)
+    try:
+        for field in status.alerts.DESCRIPTOR.fields:
+            value = getattr(status.alerts, field.name, False)
+            alerts["alert_" + field.name] = value
+            if field.number < 65:
+                alert_bits |= (1 if value else 0) << (field.number - 1)
+    except AttributeError:
+        pass
 
-    if (status.obstruction_stats.avg_prolonged_obstruction_duration_s > 0.0
-            and not math.isnan(status.obstruction_stats.avg_prolonged_obstruction_interval_s)):
-        obstruction_duration = status.obstruction_stats.avg_prolonged_obstruction_duration_s
-        obstruction_interval = status.obstruction_stats.avg_prolonged_obstruction_interval_s
-    else:
-        obstruction_duration = None
-        obstruction_interval = None
+    obstruction_duration = None
+    obstruction_interval = None
+    obstruction_stats = getattr(status, "obstruction_stats", None)
+    if obstruction_stats is not None:
+        try:
+            if (obstruction_stats.avg_prolonged_obstruction_duration_s > 0.0
+                    and not math.isnan(obstruction_stats.avg_prolonged_obstruction_interval_s)):
+                obstruction_duration = obstruction_stats.avg_prolonged_obstruction_duration_s
+                obstruction_interval = obstruction_stats.avg_prolonged_obstruction_interval_s
+        except AttributeError:
+            pass
 
+    device_info = getattr(status, "device_info", None)
     return {
-        "id": status.device_info.id,
-        "hardware_version": status.device_info.hardware_version,
-        "software_version": status.device_info.software_version,
+        "id": getattr(device_info, "id", None),
+        "hardware_version": getattr(device_info, "hardware_version", None),
+        "software_version": getattr(device_info, "software_version", None),
         "state": state,
-        "uptime": status.device_state.uptime_s,
+        "uptime": getattr(getattr(status, "device_state", None), "uptime_s", None),
         "snr": None,  # obsoleted in grpc service
-        "seconds_to_first_nonempty_slot": status.seconds_to_first_nonempty_slot,
-        "pop_ping_drop_rate": status.pop_ping_drop_rate,
-        "downlink_throughput_bps": status.downlink_throughput_bps,
-        "uplink_throughput_bps": status.uplink_throughput_bps,
-        "pop_ping_latency_ms": status.pop_ping_latency_ms,
+        "seconds_to_first_nonempty_slot": getattr(status, "seconds_to_first_nonempty_slot", None),
+        "pop_ping_drop_rate": getattr(status, "pop_ping_drop_rate", None),
+        "downlink_throughput_bps": getattr(status, "downlink_throughput_bps", None),
+        "uplink_throughput_bps": getattr(status, "uplink_throughput_bps", None),
+        "pop_ping_latency_ms": getattr(status, "pop_ping_latency_ms", None),
         "alerts": alert_bits,
-        "fraction_obstructed": status.obstruction_stats.fraction_obstructed,
-        "currently_obstructed": status.obstruction_stats.currently_obstructed,
+        "fraction_obstructed": getattr(obstruction_stats, "fraction_obstructed", None),
+        "currently_obstructed": getattr(obstruction_stats, "currently_obstructed", None),
         "seconds_obstructed": None,  # obsoleted in grpc service
         "obstruction_duration": obstruction_duration,
         "obstruction_interval": obstruction_interval,
-        "direction_azimuth": status.boresight_azimuth_deg,
-        "direction_elevation": status.boresight_elevation_deg,
-        "is_snr_above_noise_floor": status.is_snr_above_noise_floor,
+        "direction_azimuth": getattr(status, "boresight_azimuth_deg", None),
+        "direction_elevation": getattr(status, "boresight_elevation_deg", None),
+        "is_snr_above_noise_floor": getattr(status, "is_snr_above_noise_floor", None),
     }, {
         "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
-        "valid_s": status.obstruction_stats.valid_s,
+        "valid_s": getattr(obstruction_stats, "valid_s", None),
     }, alerts
 
 
