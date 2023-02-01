@@ -318,7 +318,7 @@ def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
             timestamp = int(time.time())
             history = starlink_grpc.get_history(context=gstate.context)
             gstate.timestamp_stats = timestamp
-        except grpc.RpcError as e:
+        except (AttributeError, ValueError, grpc.RpcError) as e:
             conn_error(opts, "Failure getting history: %s", str(starlink_grpc.GrpcError(e)))
             history = None
 
