@@ -1533,3 +1533,48 @@ def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = Non
         call_with_channel(grpc_call, context=context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
+
+
+def set_sleep_config(start: int,
+                     duration: int,
+                     enable: bool = True,
+                     context: Optional[ChannelContext] = None) -> None:
+    """Set sleep mode configuration.
+
+    Args:
+        start (int): Time, in minutes past midnight UTC, to start sleep mode
+            each day. Ignored if enable is set to False.
+        duration (int): Duration of sleep mode, in minutes. Ignored if enable
+            is set to False.
+        enable (bool): Whether or not to enable sleep mode.
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        GrpcError: Communication or service error, including invalid start or
+            duration.
+    """
+    if not enable:
+        start = 0
+        # duration of 0 not allowed, even when disabled
+        duration = 1
+
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(
+            dish_power_save={
+                "power_save_start_minutes": start,
+                "power_save_duration_minutes": duration,
+                "enable_power_save": enable
+            }),
+                    timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
+        raise GrpcError(e) from e
