@@ -144,6 +144,12 @@ their nature, but the field names are pretty self-explanatory.
     *alerts*.
 : **alert_power_supply_thermal_throttle** : Alert corresponding with bit 9 (bit
     mask 512) in *alerts*.
+: **alert_is_power_save_idle** : Alert corresponding with bit 10 (bit mask
+    1024) in *alerts*.
+: **alert_moving_while_not_mobile** : Alert corresponding with bit 11 (bit mask
+    2048) in *alerts*.
+: **alert_moving_fast_while_not_aviation** : Alert corresponding with bit 12
+    (bit mask 4096) in *alerts*.
 
 Location data
 -------------
