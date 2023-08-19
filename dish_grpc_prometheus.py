@@ -40,6 +40,9 @@ class MetricInfo:
 
 
 METRICS_INFO = {
+    "status_latitude": MetricInfo(),
+    "status_longitude": MetricInfo(),
+    "status_altitude": MetricInfo(),
     "status_uptime": MetricInfo(unit="seconds", kind="counter"),
     "status_seconds_to_first_nonempty_slot": MetricInfo(),
     "status_pop_ping_drop_rate": MetricInfo(),
@@ -141,7 +144,7 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage"])
+    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location"])
 
 
 def prometheus_export(opts, gstate):
