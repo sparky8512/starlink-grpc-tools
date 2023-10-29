@@ -2,7 +2,32 @@
 """Write a PNG image representing Starlink obstruction map data.
 
 This scripts queries obstruction map data from the Starlink user terminal
-reachable on the local network and writes a PNG image based on that data.
+(dish) reachable on the local network and writes a PNG image based on that
+data.
+
+Each pixel in the image represents the signal quality in a particular
+direction, as observed by the dish. If the dish has not communicated with
+satellites located in that direction, the pixel will be the "no data" color;
+otherwise, it will be a color in the range from the "obstructed" color (no
+signal at all) to the "unobstructed" color (sufficient signal quality for full
+signal).
+
+The coordinates of the pixels are the altitude and azimuth angles from the
+horizontal coordinate system representation of the sky, converted to Cartesian
+(rectangular) coordinates. The conversion is done in a way that maps all valid
+directions into a circle that touches the edges of the image. Pixels outside
+that circle will show up as "no data".
+
+Azimuth is represented as angle from a line drawn from the center of the image
+to the center of the top edge of the image, where center-top is 0 degrees
+(North), the center of the right edge is 90 degrees (East), etc.
+
+Altitude (elevation) is represented as distance from the center of the image,
+where the center of the image represents vertical up from the point of view of
+an observer located at the dish (zenith, which is usually not the physical
+direction the dish is pointing) and the further away from the center a pixel
+is, the closer to the horizon it is, down to a minimum altitude angle at the
+edge of the circle.
 """
 
 import argparse
