@@ -150,6 +150,12 @@ their nature, but the field names are pretty self-explanatory.
     2048) in *alerts*.
 : **alert_moving_fast_while_not_aviation** : Alert corresponding with bit 12
     (bit mask 4096) in *alerts*.
+    **OBSOLETE**: This alert is no longer generated, presumably in preference
+    of *alert_moving_too_fast_for_policy*.
+: **alert_dbf_telem_stale** : Alert corresponding with bit 13 (bit mask 8192)
+    in *alerts*.
+: **alert_moving_too_fast_for_policy** : Alert corresponding with bit 14 (bit
+    mask 16384) in *alerts*.
 
 Location data
 -------------
@@ -1564,7 +1570,8 @@ def get_sleep_config(context: Optional[ChannelContext] = None) -> Tuple[int, int
 
     config = call_with_channel(grpc_call, context=context)
 
-    return config.power_save_start_minutes, config.power_save_duration_minutes, config.power_save_mode
+    return (config.power_save_start_minutes, config.power_save_duration_minutes,
+            config.power_save_mode)
 
 
 def set_sleep_config(start: int,
