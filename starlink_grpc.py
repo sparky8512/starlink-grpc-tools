@@ -1535,6 +1535,38 @@ def set_stow_state(unstow: bool = False, context: Optional[ChannelContext] = Non
         raise GrpcError(e) from e
 
 
+def get_sleep_config(context: Optional[ChannelContext] = None) -> Tuple[int, int, bool]:
+    """Get current sleep mode configuration.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Returns:
+        A tuple with an int, an int, and a bool for start, duration, and
+        enable settings. See `set_sleep_config` documentation for description
+        of each.
+
+    Raises:
+        GrpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
+    """
+    def grpc_call(channel: grpc.Channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(dish_get_config={}), timeout=REQUEST_TIMEOUT)
+        return response.dish_get_config.dish_config
+
+    config = call_with_channel(grpc_call, context=context)
+
+    return config.power_save_start_minutes, config.power_save_duration_minutes, config.power_save_mode
+
+
 def set_sleep_config(start: int,
                      duration: int,
                      enable: bool = True,
