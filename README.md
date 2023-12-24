@@ -146,17 +146,17 @@ This will pull the image tagged as "latest". There should also be images for all
 
 You can run it with the following:
 ```shell script
-docker run --name='starlink-grpc-tools' ghcr.io/sparky8512/starlink-grpc-tools <script_name>.py <script args...>
+docker run --name=starlink-grpc-tools ghcr.io/sparky8512/starlink-grpc-tools <script_name>.py <script args...>
 ```
 For example, the following will print current status info and then exit:
 ```shell script
-docker run --name='starlink-grpc-tools' ghcr.io/sparky8512/starlink-grpc-tools dish_grpc_text.py -v status alert_detail
+docker run --name=starlink-grpc-tools ghcr.io/sparky8512/starlink-grpc-tools dish_grpc_text.py -v status alert_detail
 ```
 Of course, you can change the name to whatever you want instead, and use other docker run options, as appropriate.
 
-The default command is `dish_grpc_influx.py status alert_detail`, which is really only useful if you pass in environment variables with user and database info, such as:
+The default command is `dish_grpc_influx.py status alert_detail`, which is only useful if you have an InfluxDB server running somewhere and pass in environment variables with the appropriate user and database info, such as:
 ```shell script
-docker run --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
+docker run --name=starlink-grpc-tools -e INFLUXDB_HOST={InfluxDB Hostname} \
     -e INFLUXDB_PORT={Port, 8086 usually} \
     -e INFLUXDB_USER={Optional, InfluxDB Username} \
     -e INFLUXDB_PWD={Optional, InfluxDB Password} \
@@ -166,7 +166,7 @@ docker run --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
 
 When running in the background, you will probably want to specify a `-t` script option, to run in a loop, otherwise it will exit right away and leave an inactive container. For example:
 ```shell script
-docker run -d -t --name='starlink-grpc-tools' -e INFLUXDB_HOST={InfluxDB Hostname} \
+docker run -d -t --name=starlink-grpc-tools -e INFLUXDB_HOST={InfluxDB Hostname} \
     -e INFLUXDB_PORT={Port, 8086 usually} \
     -e INFLUXDB_USER={Optional, InfluxDB Username} \
     -e INFLUXDB_PWD={Optional, InfluxDB Password} \
