@@ -1,0 +1,6 @@
+services:
+  starlink-grpc-tools:
+    build: '.'
+    ports:
+      - '8080:8080'
+    command: 'dish_grpc_prometheus.py -v status alert_detail location usage'
