@@ -156,6 +156,8 @@ their nature, but the field names are pretty self-explanatory.
     in *alerts*.
 : **alert_moving_too_fast_for_policy** : Alert corresponding with bit 14 (bit
     mask 16384) in *alerts*.
+: **alert_low_motor_current** : Alert corresponding with bit 15 (bit mask
+    32768) in *alerts*.
 
 Location data
 -------------
