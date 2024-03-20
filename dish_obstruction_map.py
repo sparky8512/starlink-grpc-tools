@@ -116,6 +116,7 @@ def parse_args():
         "emit it as a PNG image")
     parser.add_argument(
         "filename",
+        nargs="?",
         help="The image file to write, or - to write to stdout; may be a template with the "
         "following to be filled in per loop iteration: %%s for sequence number, %%d for UTC date "
         "and time, %%u for seconds since Unix epoch.")
@@ -161,7 +162,14 @@ def parse_args():
                         type=int,
                         default=1,
                         help="Starting sequence number for templatized filenames, default: 1")
+    parser.add_argument("-r",
+                        "--reset",
+                        action="store_true",
+                        help="Reset obstruction map data before starting")
     opts = parser.parse_args()
+
+    if opts.filename is None and not opts.reset:
+        parser.error("Must specify a filename unless resetting")
 
     if opts.obstructed_color is None:
         opts.obstructed_color = DEFAULT_OBSTRUCTED_GREYSCALE if opts.greyscale else DEFAULT_OBSTRUCTED_COLOR
@@ -196,15 +204,19 @@ def main():
     context = starlink_grpc.ChannelContext(target=opts.target)
 
     try:
-        next_loop = time.monotonic()
-        while True:
-            rc = loop_body(opts, context)
-            if opts.loop_interval > 0.0:
-                now = time.monotonic()
-                next_loop = max(next_loop + opts.loop_interval, now)
-                time.sleep(next_loop - now)
-            else:
-                break
+        if opts.reset:
+            starlink_grpc.reset_obstruction_map(context)
+
+        if opts.filename is not None:
+            next_loop = time.monotonic()
+            while True:
+                rc = loop_body(opts, context)
+                if opts.loop_interval > 0.0:
+                    now = time.monotonic()
+                    next_loop = max(next_loop + opts.loop_interval, now)
+                    time.sleep(next_loop - now)
+                else:
+                    break
     finally:
         context.close()
 

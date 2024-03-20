@@ -1489,6 +1489,33 @@ def obstruction_map(context: Optional[ChannelContext] = None):
         raise GrpcError(e) from e
 
 
+def reset_obstruction_map(context: Optional[ChannelContext] = None):
+    """Reset obstruction map data.
+
+    This will cause the dish to discard the data it has collected about the
+    directions in which the satellite signal is obstructed and start over from
+    an empty map.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(dish_clear_obstruction_map={}), timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
+        raise GrpcError(e) from e
+
+
 def reboot(context: Optional[ChannelContext] = None) -> None:
     """Request dish reboot operation.
 
