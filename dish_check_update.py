@@ -5,24 +5,16 @@ Optionally, reboot the dish to initiate install if there is an update pending.
 """
 
 import argparse
-try:
-    from croniter import croniter
-    import dateutil.tz
-    croniter_ok = True
-except ImportError:
-    croniter_ok = False
-from datetime import datetime
 import logging
 import sys
-import time
 
 import grpc
 
+import loop_util
 import starlink_grpc
 
 # This is the enum value spacex.api.device.dish_pb2.SoftwareUpdateState.REBOOT_REQUIRED
 REBOOT_REQUIRED = 6
-MAX_SLEEP = 3600.0
 
 
 def loop_body(opts, context):
@@ -100,41 +92,15 @@ def parse_args():
                         "--target",
                         help="host:port of dish to query, default is the standard IP address "
                         "and port (192.168.100.1:9200)")
-    parser.add_argument("-t", "--loop-interval", type=float, help="Run loop at interval in seconds")
-    parser.add_argument("-c",
-                        "--loop-cron",
-                        help="Run loop on schedule defined by cron format expression")
-    parser.add_argument("-m",
-                        "--cron-timezone",
-                        help='Timezone name (IANA name or "UTC") to use for --loop-cron '
-                        'schedule; default is system local time')
     parser.add_argument("-v",
                         "--verbose",
                         action="count",
                         default=0,
                         help="Increase verbosity, may be used multiple times")
+    loop_util.add_args(parser)
     opts = parser.parse_args()
 
-    if opts.loop_interval is not None and opts.loop_cron is not None:
-        parser.error("At most one of --loop-interval and --loop-cron may be used")
-
-    if opts.cron_timezone and not opts.loop_cron:
-        parser.error("cron timezone specified, but not using cron scheduling")
-
-    if opts.loop_cron is not None:
-        if not croniter_ok:
-            parser.error("croniter is not installed, --loop-cron requires it")
-        if not croniter.is_valid(opts.loop_cron):
-            parser.error("Invalid cron format")
-        opts.timezone = dateutil.tz.gettz(opts.cron_timezone)
-        if opts.timezone is None:
-            if opts.cron_timezone is None:
-                parser.error("Failed to get local timezone, may need to use --cron-timezone")
-            else:
-                parser.error("Invalid timezone name")
-
-    if opts.loop_interval is None:
-        opts.loop_interval = 0.0
+    loop_util.check_args(opts, parser)
 
     return opts
 
@@ -146,30 +112,8 @@ def main():
 
     context = starlink_grpc.ChannelContext(target=opts.target)
 
-    rc = 0
     try:
-        if opts.loop_interval <= 0.0 and not opts.loop_cron:
-            rc = loop_body(opts, context)
-        elif opts.loop_cron:
-            criter = croniter(opts.loop_cron, datetime.now(tz=opts.timezone))
-            next_loop = criter.get_next()
-            while True:
-                now = time.time()
-                while now < next_loop:
-                    time.sleep(min(next_loop - now, MAX_SLEEP))
-                    now = time.time()
-                while next_loop < now:
-                    next_loop = criter.get_next()
-                rc = loop_body(opts, context)
-        else:
-            next_loop = time.monotonic()
-            while True:
-                rc = loop_body(opts, context)
-                now = time.monotonic()
-                next_loop = max(next_loop + opts.loop_interval, now)
-                time.sleep(next_loop - now)
-    except KeyboardInterrupt:
-        pass
+        rc = loop_util.run_loop(opts, loop_body, opts, context)
     finally:
         context.close()
 
