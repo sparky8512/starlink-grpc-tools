@@ -4,7 +4,8 @@ This module provides support for running a function from a loop at fixed
 intervals using monotonic time or on cron-like schedule using wall clock time.
 
 The cron scheduler uses the same schedule format string that cron uses for
-crontab entries.
+crontab entries, and will do its best to remain on schedule despite clock
+adjustments.
 """
 
 try:
@@ -76,15 +77,18 @@ def run_loop(opts, loop_body, *loop_args):
             rc = loop_body(*loop_args)
         elif opts.loop_cron:
             criter = croniter(opts.loop_cron, datetime.now(tz=opts.timezone))
-            next_loop = criter.get_next()
+            now = time.time()
+            next_loop = criter.get_next(start_time=now)
             while True:
-                now = time.time()
                 while now < next_loop:
+                    # This is to protect against clock getting set backwards
+                    # by a large amount. Normally, it should do nothing:
+                    next_loop = criter.get_next(start_time=now)
                     time.sleep(min(next_loop - now, MAX_SLEEP))
                     now = time.time()
-                while next_loop < now:
-                    next_loop = criter.get_next()
+                next_loop = criter.get_next(start_time=now)
                 rc = loop_body(*loop_args)
+                now = time.time()
         else:
             next_loop = time.monotonic()
             while True:

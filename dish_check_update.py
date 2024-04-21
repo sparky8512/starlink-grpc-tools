@@ -5,8 +5,10 @@ Optionally, reboot the dish to initiate install if there is an update pending.
 """
 
 import argparse
+from datetime import datetime
 import logging
 import sys
+import time
 
 import grpc
 
@@ -18,6 +20,8 @@ REBOOT_REQUIRED = 6
 
 
 def loop_body(opts, context):
+    now = time.time()
+
     try:
         status = starlink_grpc.get_status(context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
@@ -65,6 +69,10 @@ def loop_body(opts, context):
         install_pending = bool(ready_flag)
     else:
         install_pending = alert_flag or state_flag or stats_flag
+
+    if opts.verbose:
+        dtnow = datetime.fromtimestamp(now, tz=getattr(opts, "timezone", None))
+        print(dtnow.replace(microsecond=0, tzinfo=None).isoformat(), "- ", end="")
 
     if install_pending:
         print("Install pending, current version:", sw_version)
