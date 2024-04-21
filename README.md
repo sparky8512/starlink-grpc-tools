@@ -103,6 +103,25 @@ These operations can also be done using `grpcurl`, thus avoiding the need to use
 python3 dish_control.py set_sleep -h
 ```
 
+#### Firmware update checking and triggering
+
+`dish_check_update.py` checks for pending dish software updates, and can optionally trigger the update by rebooting the dish if it detects one. This can be useful if your dish normally does its automatic software install reboots at a time you don't want. To simplify this use case, this script supports a cron-like scheduling option, in addition to the `-t` periodic interval loop scheduling that most of the other scripts support.
+
+To use the cron-like scheduler, add the `-c` command line option to specify the schedule, using the same string format cron uses for its crontab entries (`minute` `hour` `day_of_month` `month` `day_of_week`). By default, it will use system local timezone, including DST adjustment. To use a different timezone, use the `-m` option. For example, to check and trigger updates at 2:30am local time daily:
+```shell script
+python3 dish_check_update.py -c "30 2 * * *" --install
+```
+or same for specific timezone:
+```shell script
+python3 dish_check_update.py -c "30 2 * * *" -m "America/Los_Angeles" --install
+```
+or to immediately check without triggering install, you can do:
+```shell script
+python3 dish_check_update.py -v
+```
+
+Run with the `-h` command line option for full usage details. For more information on the cron schedule string format or timezone names, see the [croniter](https://github.com/kiorky/croniter) or [dateutil](https://github.com/dateutil/dateutil) project documentation, respectively.
+
 ### The JSON parser script
 
 `dish_json_text.py` operates on a JSON format data representation of the protocol buffer messages, such as that output by [gRPCurl](https://github.com/fullstorydev/grpcurl). The command lines below assume `grpcurl` is installed in the runtime PATH. If that's not the case, just substitute in the full path to the command.

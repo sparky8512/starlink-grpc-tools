@@ -18,7 +18,6 @@ from datetime import datetime
 import signal
 import time
 
-
 # Max time to sleep when using non-monotonic time. This helps protect against
 # oversleeping as the result of large clock adjustments.
 MAX_SLEEP = 3600.0

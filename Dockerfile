@@ -11,15 +11,16 @@ else \
 fi; \
 # Install python prerequisites
 pip3 install --no-cache-dir $NOBIN_OPT \
-    grpcio==1.50.0 six==1.16.0 \
-    influxdb==5.3.1 certifi==2022.9.24 charset-normalizer==2.1.1 idna==3.4 \
-        msgpack==1.0.4 python-dateutil==2.8.2 pytz==2022.6 requests==2.28.1 \
-        urllib3==1.26.12 \
-    influxdb-client==1.34.0 reactivex==4.0.4 \
-    paho-mqtt==1.6.1 \
+    croniter==2.0.5 pytz==2024.1 six==1.16.0 \
+    grpcio==1.62.2 \
+    influxdb==5.3.2 certifi==2024.2.2 charset-normalizer==3.3.2 idna==3.7 \
+        msgpack==1.0.8 requests==2.31.0 urllib3==2.2.1 \
+    influxdb-client==1.42.0 reactivex==4.0.4 \
+    paho-mqtt==2.0.0 \
     pypng==0.20220715.0 \
-    typing_extensions==4.4.0 \
-    yagrc==1.1.1 grpcio-reflection==1.50.0 protobuf==4.21.9
+    python-dateutil==2.9.0 \
+    typing_extensions==4.11.0 \
+    yagrc==1.1.2 grpcio-reflection==1.62.2 protobuf==4.25.3
 
 COPY dish_*.py starlink_*.py entrypoint.sh /app/
 WORKDIR /app
