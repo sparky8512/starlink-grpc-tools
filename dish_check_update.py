@@ -17,6 +17,8 @@ import starlink_grpc
 
 # This is the enum value spacex.api.device.dish_pb2.SoftwareUpdateState.REBOOT_REQUIRED
 REBOOT_REQUIRED = 6
+# This is the enum value spacex.api.device.dish_pb2.SoftwareUpdateState.DISABLED
+UPDATE_DISABLED = 7
 
 
 def loop_body(opts, context):
@@ -41,13 +43,17 @@ def loop_body(opts, context):
 
     try:
         state_flag = status.software_update_state == REBOOT_REQUIRED
+        state_dflag = status.software_update_state == UPDATE_DISABLED
     except (AttributeError, ValueError):
         state_flag = None
+        state_dflag = None
 
     try:
         stats_flag = status.software_update_stats.software_update_state == REBOOT_REQUIRED
+        stats_dflag = status.software_update_stats.software_update_state == UPDATE_DISABLED
     except (AttributeError, ValueError):
         stats_flag = None
+        stats_dflag = None
 
     try:
         ready_flag = status.swupdate_reboot_ready
@@ -61,6 +67,10 @@ def loop_body(opts, context):
 
     if opts.verbose >= 2:
         print("Pending flags:", alert_flag, state_flag, stats_flag, ready_flag)
+        print("Disable flags:", state_dflag, stats_dflag)
+
+    if state_dflag or stats_dflag:
+        logging.warning("Software updates appear to be disabled")
 
     # The swupdate_reboot_ready field does not appear to be in use, so may
     # mean something other than what it sounds like. Only use it if none of
