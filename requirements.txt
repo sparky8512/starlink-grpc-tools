@@ -7,3 +7,5 @@ influxdb>=5.3.1
 influxdb_client>=1.23.0
 pypng>=0.0.20
 typing-extensions>=4.3.0
+croniter>=1.0.1
+python-dateutil>=2.7.0
