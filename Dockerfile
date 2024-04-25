@@ -22,7 +22,7 @@ pip3 install --no-cache-dir $NOBIN_OPT \
     typing_extensions==4.11.0 \
     yagrc==1.1.2 grpcio-reflection==1.62.2 protobuf==4.25.3
 
-COPY dish_*.py starlink_*.py entrypoint.sh /app/
+COPY dish_*.py loop_util.py starlink_*.py entrypoint.sh /app/
 WORKDIR /app
 
 ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]
