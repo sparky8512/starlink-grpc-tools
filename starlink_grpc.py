@@ -158,6 +158,8 @@ their nature, but the field names are pretty self-explanatory.
     mask 16384) in *alerts*.
 : **alert_low_motor_current** : Alert corresponding with bit 15 (bit mask
     32768) in *alerts*.
+: **lower_signal_than_predicted** : Alert corresponding with bit 16 (bit mask
+    65536) in *alerts*.
 
 Location data
 -------------
