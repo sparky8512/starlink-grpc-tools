@@ -40,6 +40,8 @@ class MetricInfo:
 
 
 METRICS_INFO = {
+    "status_gps_valid": MetricInfo(),
+    "status_gps_sats": MetricInfo(),
     "status_latitude": MetricInfo(),
     "status_longitude": MetricInfo(),
     "status_altitude": MetricInfo(),

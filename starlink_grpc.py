@@ -782,6 +782,7 @@ def status_data(
             pass
 
     device_info = getattr(status, "device_info", None)
+    gps_stats = getattr(status, "gps_stats", None)
     return {
         "id": getattr(device_info, "id", None),
         "hardware_version": getattr(device_info, "hardware_version", None),
@@ -803,6 +804,8 @@ def status_data(
         "direction_azimuth": getattr(status, "boresight_azimuth_deg", None),
         "direction_elevation": getattr(status, "boresight_elevation_deg", None),
         "is_snr_above_noise_floor": getattr(status, "is_snr_above_noise_floor", None),
+        "gps_valid": getattr(gps_stats, "gps_valid", None),
+        "gps_sats": getattr(gps_stats, "gps_sats", None),
     }, {
         "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
