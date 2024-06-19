@@ -41,6 +41,9 @@ class MetricInfo:
 
 METRICS_INFO = {
     "status_uptime": MetricInfo(unit="seconds", kind="counter"),
+    "status_longitude": MetricInfo(),
+    "status_latitude": MetricInfo(),
+    "status_altitude": MetricInfo(),
     "status_seconds_to_first_nonempty_slot": MetricInfo(),
     "status_pop_ping_drop_rate": MetricInfo(),
     "status_downlink_throughput_bps": MetricInfo(),
@@ -65,6 +68,13 @@ METRICS_INFO = {
     "status_alert_install_pending": MetricInfo(),
     "status_alert_is_heating": MetricInfo(),
     "status_alert_power_supply_thermal_throttle": MetricInfo(),
+    "status_alert_slow_ethernet_speeds_100": MetricInfo(),
+    "status_alert_is_power_save_idle": MetricInfo(),
+    "status_alert_moving_while_not_mobile": MetricInfo(),
+    "status_alert_moving_too_fast_for_policy": MetricInfo(),
+    "status_alert_dbf_telem_stale": MetricInfo(),
+    "status_alert_low_motor_current": MetricInfo(),
+    "status_alert_lower_signal_than_predicted": MetricInfo(),
     "ping_stats_samples": MetricInfo(kind="counter"),
     "ping_stats_end_counter": MetricInfo(kind="counter"),
     "usage_download_usage": MetricInfo(unit="bytes", kind="counter"),
@@ -141,7 +151,7 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage"])
+    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location"])
 
 
 def prometheus_export(opts, gstate):
