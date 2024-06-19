@@ -43,8 +43,6 @@ return data in a format Prometheus can scrape.
 
 All these scripts support processing status data and/or history data in various modes. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app, whereas most of the data displayed in the Statistics page of the Starlink app comes from the history data. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
 
-`dish_grpc_prometheus.py` only allows the modes `status`, `usage`, and `alert_detail`.
-
 For example, data from all the currently available status groups can be output by doing:
 ```shell script
 python3 dish_grpc_text.py status obstruction_detail alert_detail
