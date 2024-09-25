@@ -10,7 +10,8 @@ Requested data will be written into the following tables:
 : status : Current status data
 : history : Bulk history data
 : ping_stats : Ping history statistics
-: usage : Usage history statistics
+: usage : Bandwidth usage history statistics
+: power : Power consumption history statistics
 
 Array data is currently written to the database as text strings of comma-
 separated values, which may not be the best method for some use cases. If you
@@ -46,7 +47,7 @@ import time
 import dish_common
 import starlink_grpc
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class Terminated(Exception):
@@ -100,7 +101,7 @@ def query_counter(opts, gstate, column, table):
 
 
 def loop_body(opts, gstate, shutdown=False):
-    tables = {"status": {}, "ping_stats": {}, "usage": {}}
+    tables = {"status": {}, "ping_stats": {}, "usage": {}, "power": {}}
     hist_cols = ["time", "id"]
     hist_rows = []
 
@@ -218,6 +219,7 @@ def create_tables(conn, context, suffix):
     type_groups = starlink_grpc.history_stats_field_types()
     tables["ping_stats"] = zip(name_groups[0:5], type_groups[0:5])
     tables["usage"] = ((name_groups[5], type_groups[5]),)
+    tables["power"] = ((name_groups[6], type_groups[6]),)
 
     name_groups = starlink_grpc.history_bulk_field_names()
     type_groups = starlink_grpc.history_bulk_field_types()

@@ -10,6 +10,7 @@ Data will be published to the following topic names:
 : starlink/dish_status/*id_value*/*field_name* : Current status data
 : starlink/dish_ping_stats/*id_value*/*field_name* : Ping history statistics
 : starlink/dish_usage/*id_value*/*field_name* : Usage history statistics
+: starlink/dish_power/*id_value*/*field_name* : Power history statistics
 
 Where *id_value* is the *id* value from the dish status information.
 

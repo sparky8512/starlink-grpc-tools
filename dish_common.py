@@ -26,7 +26,7 @@ BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
 LOOP_TIME_DEFAULT = 0
 STATUS_MODES: List[str] = ["status", "obstruction_detail", "alert_detail", "location"]
 HISTORY_STATS_MODES: List[str] = [
-    "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage"
+    "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage", "power"
 ]
 UNGROUPED_MODES: List[str] = []
 
@@ -370,7 +370,7 @@ def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
                                          start=start,
                                          verbose=opts.verbose,
                                          history=gstate.accum_history)
-    general, ping, runlen, latency, loaded, usage = groups[0:6]
+    general, ping, runlen, latency, loaded, usage, power = groups[0:7]
     add_data = add_data_numeric if opts.numeric else add_data_normal
     add_data(general, "ping_stats", add_item, add_sequence)
     if "ping_drop" in opts.mode:
@@ -383,6 +383,8 @@ def get_history_stats(opts, gstate, add_item, add_sequence, flush_history):
         add_data(loaded, "ping_stats", add_item, add_sequence)
     if "usage" in opts.mode:
         add_data(usage, "usage", add_item, add_sequence)
+    if "power" in opts.mode:
+        add_data(power, "power", add_item, add_sequence)
     if not opts.no_counter:
         gstate.counter_stats = general["end_counter"]
 
