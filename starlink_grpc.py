@@ -160,6 +160,10 @@ their nature, but the field names are pretty self-explanatory.
     32768) in *alerts*.
 : **lower_signal_than_predicted** : Alert corresponding with bit 16 (bit mask
     65536) in *alerts*.
+: **slow_ethernet_speeds_100** : Alert corresponding with bit 17 (bit mask
+    131072) in *alerts*.
+: **obstruction_map_reset** : Alert corresponding with bit 18 (bit mask
+    262144) in *alerts*.
 
 Location data
 -------------
@@ -215,16 +219,6 @@ representing the value over time, ending at the current time.
     Starlink app.
     **OBSOLETE**: The user terminal no longer provides this data.
 : **power_w** : Power consumed during the sample period, in watts.
-
-There is no specific data field in the raw history data that directly
-correlates with "Other" or "Beta downtime" in the Starlink app (or whatever it
-gets renamed to after beta), but empirical evidence suggests any sample where
-*pop_ping_drop_rate* is 1, *scheduled* is true, and *obstructed* is false is
-counted as "Beta downtime".
-
-Note that neither *scheduled*=false nor *obstructed*=true necessarily means
-packet loss occurred. Those need to be examined in combination with
-*pop_ping_drop_rate* to be meaningful.
 
 General ping drop history statistics
 ------------------------------------
@@ -385,15 +379,15 @@ user terminal hardware over the sample period.
 Note: Not all user terminal hardware supports this functionality. On
 unsupported hardware, the values will all report as 0.0.
 
-: **latest_power"** : The power consumption during the most recent sample, in
+: **latest_power** : The power consumption during the most recent sample, in
     watts.
-: **mean_power"** : The mean (average) power consumption over the sample
+: **mean_power** : The mean (average) power consumption over the sample
     period, in watts.
-: **min_power"** : The power consumption of the sample that used the least
+: **min_power** : The power consumption of the sample that used the least
     power during the sample period, in watts.
-: **max_power"** : The power consumption of the sample that used the most
+: **max_power** : The power consumption of the sample that used the most
     power during the sample period, in watts.
-: **total_energy"** : Total amount of energy used during the sample period, in
+: **total_energy** : Total amount of energy used during the sample period, in
     kilowatt-hours.
 """
 
