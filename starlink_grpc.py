@@ -214,6 +214,7 @@ representing the value over time, ending at the current time.
     the sample period. When true, ping drop shows as "Obstructed" in the
     Starlink app.
     **OBSOLETE**: The user terminal no longer provides this data.
+: **power_w** : Power consumed during the sample period, in watts.
 
 There is no specific data field in the raw history data that directly
 correlates with "Other" or "Beta downtime" in the Starlink app (or whatever it
@@ -375,6 +376,25 @@ period.
     during the sample period.
 : **upload_usage** : Total number of bytes uploaded from the user terminal
     during the sample period.
+
+Power consumption statistics
+----------------------------
+This group of statistics characterize the electrical power consumption of the
+user terminal hardware over the sample period.
+
+Note: Not all user terminal hardware supports this functionality. On
+unsupported hardware, the values will all report as 0.0.
+
+: **latest_power"** : The power consumption during the most recent sample, in
+    watts.
+: **mean_power"** : The mean (average) power consumption over the sample
+    period, in watts.
+: **min_power"** : The power consumption of the sample that used the least
+    power during the sample period, in watts.
+: **max_power"** : The power consumption of the sample that used the most
+    power during the sample period, in watts.
+: **total_energy"** : Total amount of energy used during the sample period, in
+    kilowatt-hours.
 """
 
 from itertools import chain
@@ -401,7 +421,7 @@ from spacex.api.device import dish_pb2
 REQUEST_TIMEOUT = 10
 
 HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
-                  "uplink_throughput_bps")
+                  "uplink_throughput_bps", "power_in")
 
 StatusDict = TypedDict(
     "StatusDict", {
@@ -456,6 +476,7 @@ HistBulkDict = TypedDict(
         "snr": Sequence[Optional[float]],
         "scheduled": Sequence[Optional[bool]],
         "obstructed": Sequence[Optional[bool]],
+        "power_w": Sequence[float],
     })
 
 PingDropDict = TypedDict(
@@ -499,6 +520,15 @@ UsageDict = TypedDict("UsageDict", {
     "download_usage": int,
     "upload_usage": int,
 })
+
+PowerDict = TypedDict(
+    "PowerDict", {
+        "latest_power": Optional[float],
+        "mean_power": Optional[float],
+        "min_power": Optional[float],
+        "max_power": Optional[float],
+        "total_energy": float,
+    })
 
 # For legacy reasons, there is a slight difference between the field names
 # returned in the actual data vs the *_field_names functions. This is a map of
@@ -936,17 +966,19 @@ def history_stats_field_names():
         See module level docs regarding brackets in field names.
 
     Returns:
-        A tuple with 6 lists, with general data names, ping drop stat names,
+        A tuple with 7 lists, with general data names, ping drop stat names,
         ping drop run length stat names, ping latency stat names, loaded ping
-        latency stat names, and bandwidth usage stat names, in that order.
+        latency stat names, bandwidth usage stat names, and power consumption
+        stat names, in that order.
 
         Note:
             Additional lists may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
     """
     return (_field_names(HistGeneralDict), _field_names(PingDropDict), _field_names(PingDropRlDict),
-            _field_names(PingLatencyDict), _field_names(LoadedLatencyDict), _field_names(UsageDict))
+            _field_names(PingLatencyDict), _field_names(LoadedLatencyDict), _field_names(UsageDict),
+            _field_names(PowerDict))
 
 
 def history_stats_field_types():
@@ -956,17 +988,19 @@ def history_stats_field_types():
     element in the sequence is returned, not the type of the sequence.
 
     Returns:
-        A tuple with 6 lists, with general data types, ping drop stat types,
+        A tuple with 7 lists, with general data types, ping drop stat types,
         ping drop run length stat types, ping latency stat types, loaded ping
-        latency stat types, and bandwidth usage stat types, in that order.
+        latency stat types, bandwidth usage stat types, and power consumption
+        stat types, in that order.
 
         Note:
             Additional lists may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
     """
     return (_field_types(HistGeneralDict), _field_types(PingDropDict), _field_types(PingDropRlDict),
-            _field_types(PingLatencyDict), _field_types(LoadedLatencyDict), _field_types(UsageDict))
+            _field_types(PingLatencyDict), _field_types(LoadedLatencyDict), _field_types(UsageDict),
+            _field_types(PowerDict))
 
 
 def get_history(context: Optional[ChannelContext] = None):
@@ -1183,6 +1217,7 @@ def history_bulk_data(parse_samples: int,
     pop_ping_latency_ms = []
     downlink_throughput_bps = []
     uplink_throughput_bps = []
+    power_w: List[Optional[float]] = []
 
     for i in sample_range:
         # pop_ping_drop_rate is checked in _compute_sample_range
@@ -1210,6 +1245,13 @@ def history_bulk_data(parse_samples: int,
             pass
         uplink_throughput_bps.append(uplink)
 
+        power = None
+        try:
+            power = history.power_in[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        power_w.append(power)
+
     return {
         "samples": parsed_samples,
         "end_counter": current,
@@ -1221,6 +1263,7 @@ def history_bulk_data(parse_samples: int,
         "snr": [None] * parsed_samples,  # obsoleted in grpc service
         "scheduled": [None] * parsed_samples,  # obsoleted in grpc service
         "obstructed": [None] * parsed_samples,  # obsoleted in grpc service
+        "power_w": power_w,
     }
 
 
@@ -1239,7 +1282,7 @@ def history_stats(
     context: Optional[ChannelContext] = None,
     history=None
 ) -> Tuple[HistGeneralDict, PingDropDict, PingDropRlDict, PingLatencyDict, LoadedLatencyDict,
-           UsageDict]:
+           UsageDict, PowerDict]:
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
@@ -1258,15 +1301,15 @@ def history_stats(
             it, from a prior call to `get_history`.
 
     Returns:
-        A tuple with 6 dicts, mapping general data names, ping drop stat
+        A tuple with 7 dicts, mapping general data names, ping drop stat
         names, ping drop run length stat names, ping latency stat names,
-        loaded ping latency stat names, and bandwidth usage stat names to
-        their respective values, in that order.
+        loaded ping latency stat names, bandwidth usage stat names, and power
+        consumption stat names to their respective values, in that order.
 
         Note:
             Additional dicts may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
 
     Raises:
         GrpcError: Failed getting history info from the Starlink user
@@ -1299,6 +1342,11 @@ def history_stats(
 
     usage_down = 0.0
     usage_up = 0.0
+
+    power_latest: Optional[float] = None
+    power_min: Optional[float] = None
+    power_max: Optional[float] = None
+    energy = 0.0
 
     rtt_full: List[float] = []
     rtt_all: List[Tuple[float, float]] = []
@@ -1352,6 +1400,17 @@ def history_stats(
                 rtt_buckets[0].append(rtt)
         if d < 1.0:
             rtt_all.append((rtt, 1.0 - d))
+
+        try:
+            power = history.power_in[i]
+            if power_min is None or power < power_min:
+                power_min = power
+            if power_max is None or power > power_max:
+                power_max = power
+            energy += power
+            power_latest = power
+        except (AttributeError, IndexError, TypeError):
+            pass
 
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
@@ -1435,6 +1494,12 @@ def history_stats(
     }, {
         "download_usage": int(round(usage_down / 8)),
         "upload_usage": int(round(usage_up / 8)),
+    }, {
+        "latest_power": power_latest,
+        "mean_power": None if parsed_samples == 0 else energy / parsed_samples,
+        "min_power": power_min,
+        "max_power": power_max,
+        "total_energy": energy / 3600 / 1000,
     }
 
 
