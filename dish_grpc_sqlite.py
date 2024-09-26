@@ -264,14 +264,19 @@ def convert_tables(conn, context):
     old_cur = conn.cursor()
     new_cur = conn.cursor()
     for table, new_columns in new_column_info.items():
-        old_cur.execute('SELECT * FROM "{0}"'.format(table))
-        old_columns = set(x[0] for x in old_cur.description)
-        new_columns = tuple(x for x in new_columns if x in old_columns)
-        sql = 'INSERT OR REPLACE INTO "{0}_new" ({1}) VALUES ({2})'.format(
-            table, ",".join('"' + x + '"' for x in new_columns),
-            ",".join(repeat("?", len(new_columns))))
-        new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
-        new_cur.execute('DROP TABLE "{0}"'.format(table))
+        try:
+            old_cur.execute('SELECT * FROM "{0}"'.format(table))
+            table_ok = True
+        except sqlite3.OperationalError:
+            table_ok = False
+        if table_ok:
+            old_columns = set(x[0] for x in old_cur.description)
+            new_columns = tuple(x for x in new_columns if x in old_columns)
+            sql = 'INSERT OR REPLACE INTO "{0}_new" ({1}) VALUES ({2})'.format(
+                table, ",".join('"' + x + '"' for x in new_columns),
+                ",".join(repeat("?", len(new_columns))))
+            new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
+            new_cur.execute('DROP TABLE "{0}"'.format(table))
         new_cur.execute('ALTER TABLE "{0}_new" RENAME TO "{0}"'.format(table))
     old_cur.close()
     new_cur.close()
