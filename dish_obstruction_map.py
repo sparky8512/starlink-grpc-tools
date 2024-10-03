@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Write a PNG image representing Starlink obstruction map data.
 
 This scripts queries obstruction map data from the Starlink user terminal

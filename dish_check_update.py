@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Check whether there is a software update pending on a Starlink user terminal.
 
 Optionally, reboot the dish to initiate install if there is an update pending.

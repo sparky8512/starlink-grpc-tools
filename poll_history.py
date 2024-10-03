@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """A simple(?) example for using the starlink_grpc module.
 
 This script shows an example of how to use the starlink_grpc module to

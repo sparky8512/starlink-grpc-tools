@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Publish Starlink user terminal data to a MQTT broker.
 
 This script pulls the current status info and/or metrics computed from the
