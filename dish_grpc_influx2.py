@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Write Starlink user terminal data to an InfluxDB 2.x database.
 
 This script pulls the current status info and/or metrics computed from the

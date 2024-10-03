@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 r"""Output Starlink user terminal data info in text format.
 
 Expects input as from the following command:

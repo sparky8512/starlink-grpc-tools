@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Output Starlink user terminal data info in text format.
 
 This script pulls the current status info and/or metrics computed from the
