@@ -3,7 +3,7 @@ This repository has a handful of tools for interacting with the [gRPC](https://g
 
 For more information on what Starlink is, see [starlink.com](https://www.starlink.com/) and/or the [r/Starlink subreddit](https://www.reddit.com/r/Starlink/).
 
-## Prerequisites
+## Prerequisites / Installation
 
 Most of the scripts here are [Python](https://www.python.org/) scripts. To use them, you will either need Python installed on your system or you can use the Docker image. If you use the Docker image, you can skip the rest of the prerequisites other than making sure the dish IP is reachable and Docker itself. For Linux systems, the python package from your distribution should be fine, as long as it is Python 3, version 3.7 or later.
 
@@ -13,7 +13,9 @@ Running the scripts within a [Docker](https://www.docker.com/) container require
 
 ### Required Python modules (for non-Docker usage)
 
-The easiest way to get the Python modules used by the scripts is to do the following, which will install latest versions of a superset of the required modules:
+The scripts require a number of Python modules to be present in your local Python environment. It is recommended to [create and use a virtual environment](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments) (venv) for this purpose, but usually not required. However, some OS distribution's Python installations may require the use of venv when running at `root`/`Administrator` user. If you don't want to deal with that, either install as a different user, or add the `--user` option after the word `install` in the following command, but be aware that will only make it available to that user.
+
+The easiest way to get the required modules is to run the following command, which will install latest versions of a superset of the required modules:
 ```shell script
 pip install --upgrade -r requirements.txt
 ```
