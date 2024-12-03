@@ -781,13 +781,13 @@ def status_data(
     pop_ping_drop_rate = None
     pop_ping_latency_ms = None
     latest_range = _compute_sample_range(history, 1)[0]
-    if latest_range:
-        latest_index = latest_range[0]
+    for latest_index in latest_range:
         pop_ping_drop_rate = history.pop_ping_drop_rate[latest_index]
         try:
             pop_ping_latency_ms = history.pop_ping_latency_ms[latest_index]
         except (AttributeError, IndexError, TypeError):
             pass
+        break
 
     try:
         if status.HasField("outage"):
