@@ -32,6 +32,13 @@ def parse_args():
                               nargs="?",
                               type=int,
                               help="Duration in minutes, or 0 to disable")
+    gps_parser = subs.add_parser(
+        "set_gps",
+        help="Enable, disable, or show usage of GPS for position data",
+        description="Run without arguments to show current configuration")
+    gps_parser.add_argument("--enable",
+                            action=argparse.BooleanOptionalAction,
+                            help="Enable/disable use of GPS for position data")
 
     opts = parser.parse_args()
     if opts.command == "set_sleep" and opts.start is not None:
@@ -61,7 +68,7 @@ def main():
                 request = request_class(dish_stow={})
             elif opts.command == "unstow":
                 request = request_class(dish_stow={"unstow": True})
-            else:  # set_sleep
+            elif opts.command == "set_sleep":
                 if opts.start is None and opts.duration is None:
                     request = request_class(dish_get_config={})
                 else:
@@ -78,6 +85,11 @@ def main():
                             "power_save_duration_minutes": 1,
                             "enable_power_save": False
                         })
+            elif opts.command == "set_gps":
+                if opts.enable is None:
+                    request = request_class(get_status={})
+                else:
+                    request = request_class(dish_inhibit_gps={"inhibit_gps": not opts.enable})
 
             response = stub.Handle(request, timeout=10)
 
@@ -89,6 +101,12 @@ def main():
                     print("Sleep duration:", config.power_save_duration_minutes, "minutes")
                 else:
                     print("Sleep disabled")
+            elif opts.command == "set_gps" and opts.enable is None:
+                status = response.dish_get_status
+                if status.gps_stats.inhibit_gps:
+                    print("GPS disabled")
+                else:
+                    print("GPS enabled")
     except (AttributeError, ValueError, grpc.RpcError) as e:
         if isinstance(e, grpc.Call):
             msg = e.details()
