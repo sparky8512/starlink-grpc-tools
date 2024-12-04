@@ -88,7 +88,7 @@ python3 dish_obstruction_map.py -t 3600 obstructions_%s.png
 
 Run it with the `-h` command line option for full usage details, including control of the map colors and color modes.
 
-#### Reboot, stow, and sleep control
+#### Reboot, stow, sleep, and GPS control
 
 `dish_control.py` is a simple stand alone script that can issue reboot, stow, or unstow commands to the dish:
 ```shell script
@@ -102,6 +102,14 @@ These operations can also be done using `grpcurl`, thus avoiding the need to use
 ```shell script
 python3 dish_control.py set_sleep -h
 ```
+
+It can also tell the dish whether or not to use GPS for position data. You can get usage instructions for that by doing:
+```shell script
+python3 dish_control.py set_gps -h
+```
+**NOTE**: This has no impact on whether or not the location data can be polled (see [above section](#enabling-access-to-location-data)). It only instructs the dish whether or not to use GPS for its own purposes. If this is not meaningful to you, then you should probably not mess with this setting. Note also that this setting is not preserved across dish reboot, at which point it will reset to the default of GPS enabled.
+
+Finally, all the commands supported by this script can be run periodically, either by using the `-t` option most of the other scripts support, or the `-c` option to use the cron-like scheduler described in the [next section](#firmware-update-checking-and-triggering).
 
 #### Firmware update checking and triggering
 

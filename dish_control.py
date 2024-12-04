@@ -8,6 +8,8 @@ import sys
 import grpc
 from yagrc import reflector as yagrc_reflector
 
+import loop_util
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Starlink user terminal state control")
@@ -39,8 +41,10 @@ def parse_args():
     gps_parser.add_argument("--enable",
                             action=argparse.BooleanOptionalAction,
                             help="Enable/disable use of GPS for position data")
+    loop_util.add_args(parser)
 
     opts = parser.parse_args()
+
     if opts.command == "set_sleep" and opts.start is not None:
         if opts.duration is None:
             sleep_parser.error("Must specify duration if start time is specified")
@@ -48,14 +52,12 @@ def parse_args():
             sleep_parser.error("Invalid start time, must be >= 0 and < 1440")
         if opts.duration < 0 or opts.duration > 1440:
             sleep_parser.error("Invalid duration, must be >= 0 and <= 1440")
+    loop_util.check_args(opts, parser)
+
     return opts
 
 
-def main():
-    opts = parse_args()
-
-    logging.basicConfig(format="%(levelname)s: %(message)s")
-
+def loop_body(opts):
     reflector = yagrc_reflector.GrpcReflectionClient()
     try:
         with grpc.insecure_channel(opts.target) as channel:
@@ -115,9 +117,18 @@ def main():
         else:
             msg = "Unknown communication or service error"
         logging.error(msg)
-        sys.exit(1)
+        return 1
 
-    sys.exit(0)
+    return 0
+
+
+def main():
+    opts = parse_args()
+
+    logging.basicConfig(format="%(levelname)s: %(message)s")
+
+    rc = loop_util.run_loop(opts, loop_body, opts)
+    sys.exit(rc)
 
 
 if __name__ == "__main__":
