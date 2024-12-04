@@ -163,13 +163,13 @@ Possibly more simple examples to come, as the other scripts have started getting
 
 ## Running with Docker
 
-The supported docker image for this project is now the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools). This is a multi-arch image built for `linux/amd64` (x64_64) and `linux/arm64` (aarch64) docker platforms.
+The supported docker image for this project is the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools). This is a multi-arch image built for `linux/amd64` (x64_64) and `linux/arm64` (aarch64) docker platforms.
 
 You can get the "latest" image with the following command:
 ```shell script
 docker pull ghcr.io/sparky8512/starlink-grpc-tools
 ```
-This will pull the image tagged as "latest". There should also be images for all recent tagged releases of this project, but those tend to be few and far between, so the most recent one may be missing some important changes. See the package repository for a full list of tagged images.
+This will pull the image tagged as "latest", which will be the latest image generated that has at least been sanity-tested to not be completely broken. There should also be images for all recent tagged releases of this project. See the package repository for a full list of tagged images.
 
 You can run it with the following:
 ```shell script
@@ -201,8 +201,6 @@ docker run -d -t --name=starlink-grpc-tools -e INFLUXDB_HOST={InfluxDB Hostname}
     ghcr.io/sparky8512/starlink-grpc-tools -v -t 60 status alert_detail
 ```
 The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
-
-If there is some problem with accessing the image from the GitHub Packages repository, there is also an image available on Docker Hub, which can be accessed as `neurocis/starlink-grpc-tools`, but note that that image may not be as up to date with changes as the supported one.
 
 ## Running with SystemD
 
