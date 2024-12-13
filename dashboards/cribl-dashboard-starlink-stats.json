@@ -1,0 +1,308 @@
+{
+  "layout": {},
+  "schedule": {
+    "enabled": false,
+    "cronSchedule": "0 0 * * *",
+    "tz": "UTC",
+    "keepLastN": 2
+  },
+  "name": "Starlink Statistics",
+  "description": "This Dashboard is meant to be a clone of the starlink App's Statitics Page",
+  "elements": [
+    {
+      "config": {
+        "markdown": "# Starlink Statistics\n--- \nThis Dashboard is meant to be a clone of the starlink App's Statitics Page. Increase time python script calls API for more accurate results. (Default API Call: 60 seconds)\n",
+        "axis": {}
+      },
+      "id": "1p7z19fum",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 2
+      },
+      "variant": "markdown",
+      "type": "markdown.default"
+    },
+    {
+      "config": {
+        "markdown": "### What is Latency?\n- Starlink and the Starlink router both send test pings to the internet many times per minute. Latency measures how long, in milliseconds, a request takes to go to the internet and back.\n\n- High latency may impact your experience with online gaming, video calls, and web browsing. It may be caused by extreme weather or periods of high network usage.\n\n",
+        "axis": {}
+      },
+      "id": "84gt5a832",
+      "layout": {
+        "x": 0,
+        "y": 2,
+        "w": 6,
+        "h": 2
+      },
+      "variant": "markdown",
+      "type": "markdown.default"
+    },
+    {
+      "config": {
+        "markdown": "### What is power Draw?\n- Power Draw Measures the average amount of power that Starlink Uses. Starlink will use more power while heating to melt snow.\n\n",
+        "axis": {}
+      },
+      "id": "pyoifapcf",
+      "layout": {
+        "x": 6,
+        "y": 2,
+        "w": 6,
+        "h": 2
+      },
+      "variant": "markdown",
+      "type": "markdown.default"
+    },
+    {
+      "config": {
+        "onClickAction": {
+          "type": "None"
+        },
+        "style": true,
+        "applyThreshold": false,
+        "colorThresholds": {
+          "thresholds": [
+            {
+              "color": "#45850B",
+              "threshold": 30
+            },
+            {
+              "color": "#EFDB23",
+              "threshold": 70
+            },
+            {
+              "color": "#B20000",
+              "threshold": 100
+            }
+          ]
+        },
+        "axis": {
+          "xAxis": "avg_mean_full_ping_latency",
+          "yAxis": [
+            "avg_mean_full_ping_latency"
+          ]
+        },
+        "decimals": 2,
+        "suffix": " ms"
+      },
+      "search": {
+        "type": "inline",
+        "query": "dataset=\"starlink\" sourcetype in (\"starlink:ping_latency\") | extract parser=json_parser |  summarize avg_mean_full_ping_latency=avg(mean_full_ping_latency) ",
+        "earliest": "-15m",
+        "latest": "now"
+      },
+      "id": "kfntldnby",
+      "layout": {
+        "x": 0,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      },
+      "type": "counter.single",
+      "title": "Average Mean Full Ping Latency - Last 15 Min"
+    },
+    {
+      "config": {
+        "onClickAction": {
+          "type": "None"
+        },
+        "style": true,
+        "applyThreshold": false,
+        "colorThresholds": {
+          "thresholds": [
+            {
+              "color": "#45850B",
+              "threshold": 30
+            },
+            {
+              "color": "#EFDB23",
+              "threshold": 70
+            },
+            {
+              "color": "#B20000",
+              "threshold": 100
+            }
+          ]
+        },
+        "axis": {
+          "xAxis": "avg_mean_power",
+          "yAxis": [
+            "avg_mean_power"
+          ]
+        },
+        "decimals": 2,
+        "suffix": " Watts"
+      },
+      "search": {
+        "type": "inline",
+        "query": "dataset=\"starlink\" sourcetype=\"starlink:power\" | extract parser=json_parser  | summarize avg_mean_power=avg(mean_power)",
+        "earliest": "-15m",
+        "latest": "now"
+      },
+      "id": "7o73dimso",
+      "layout": {
+        "x": 6,
+        "y": 4,
+        "w": 6,
+        "h": 3
+      },
+      "type": "counter.single",
+      "title": "Power Draw Average - Last 15 Min"
+    },
+    {
+      "config": {
+        "colorPalette": 0,
+        "colorPaletteReversed": false,
+        "customData": {
+          "trellis": false,
+          "connectNulls": "Leave gaps",
+          "stack": false,
+          "seriesCount": 1
+        },
+        "xAxis": {
+          "labelOrientation": 0,
+          "position": "Bottom"
+        },
+        "yAxis": {
+          "position": "Left",
+          "scale": "Linear",
+          "splitLine": true,
+          "interval": 2,
+          "min": 20,
+          "max": 35
+        },
+        "axis": {
+          "yAxis": [
+            "values_ping_latency"
+          ],
+          "yAxisExcluded": [
+            "_time"
+          ]
+        },
+        "legend": {
+          "position": "Right",
+          "truncate": true
+        },
+        "onClickAction": {
+          "type": "None"
+        },
+        "seriesInfo": {
+          "values_ping_latency": {
+            "type": "column"
+          },
+          "_time": {}
+        }
+      },
+      "search": {
+        "type": "inline",
+        "query": "dataset=\"starlink\" sourcetype in (\"starlink:ping_latency\") | extract parser=json_parser | timestats values(mean_full_ping_latency) ",
+        "earliest": "-15m",
+        "latest": "now"
+      },
+      "id": "n5lu6hhw0",
+      "layout": {
+        "x": 0,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "type": "chart.column",
+      "hidePanel": false,
+      "title": "Ping Latency - Last 15 Min"
+    },
+    {
+      "config": {
+        "colorPalette": 1,
+        "colorPaletteReversed": false,
+        "customData": {
+          "trellis": false,
+          "connectNulls": "Leave gaps",
+          "stack": false,
+          "seriesCount": 1
+        },
+        "xAxis": {
+          "labelOrientation": 0,
+          "position": "Bottom"
+        },
+        "yAxis": {
+          "position": "Left",
+          "scale": "Linear",
+          "splitLine": true,
+          "min": 25,
+          "max": 70,
+          "interval": 5
+        },
+        "axis": {
+          "yAxis": [
+            "values_latest_power"
+          ],
+          "yAxisExcluded": [
+            "_time"
+          ]
+        },
+        "legend": {
+          "position": "Top",
+          "truncate": true
+        },
+        "onClickAction": {
+          "type": "None"
+        },
+        "seriesInfo": {
+          "_time": {
+            "color": "#29bd00"
+          },
+          "values_latest_power": {
+            "color": "#369900",
+            "type": "area"
+          }
+        }
+      },
+      "search": {
+        "type": "inline",
+        "query": "dataset=\"starlink\" sourcetype=\"starlink:power\" | extract parser=json_parser  | timestats values(latest_power)",
+        "earliest": "-15m",
+        "latest": "now"
+      },
+      "id": "20ekij4vo",
+      "layout": {
+        "x": 6,
+        "y": 7,
+        "w": 6,
+        "h": 5
+      },
+      "type": "chart.column",
+      "title": "Power Draw - Last 15 Min"
+    },
+    {
+      "config": {
+        "markdown": "## What is ping success?\n- Starlink and the Starlink router both send test pings to the internet many times per minute. It is normal for some pings to be dropped, and your connection to the internet to remain unaffected.",
+        "axis": {}
+      },
+      "id": "2o01xt5al",
+      "layout": {
+        "x": 0,
+        "y": 12,
+        "w": 6,
+        "h": 2
+      },
+      "variant": "markdown",
+      "type": "markdown.default"
+    },
+    {
+      "config": {
+        "markdown": "## What is throughput?\n- 'Download' and 'Upload' measure the amount of data that your Starlink is downloading from or uploading to the internet. Download a large file or run a speed test to watch it jump!",
+        "axis": {}
+      },
+      "id": "hwr5nirfk",
+      "layout": {
+        "x": 6,
+        "y": 12,
+        "w": 5,
+        "h": 2
+      },
+      "variant": "markdown",
+      "type": "markdown.default"
+    }
+  ]
+}
