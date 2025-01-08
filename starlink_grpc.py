@@ -84,6 +84,10 @@ This group holds information about the current state of the user terminal.
 : **is_snr_above_noise_floor** : Boolean indicating whether or not the dish
     considers the signal to noise ratio to be above some minimum threshold for
     connectivity, currently 3dB.
+: **gps_ready** : Boolean indicating whether or not the user terminal is ready
+    to use GPS for position data.
+: **gps_enabled** : Boolean indicating whether or not the user terminal will
+    use GPS for position data if and when it becomes ready.
 
 Obstruction detail status data
 ------------------------------
@@ -156,6 +160,14 @@ their nature, but the field names are pretty self-explanatory.
     in *alerts*.
 : **alert_moving_too_fast_for_policy** : Alert corresponding with bit 14 (bit
     mask 16384) in *alerts*.
+: **alert_low_motor_current** : Alert corresponding with bit 15 (bit mask
+    32768) in *alerts*.
+: **lower_signal_than_predicted** : Alert corresponding with bit 16 (bit mask
+    65536) in *alerts*.
+: **slow_ethernet_speeds_100** : Alert corresponding with bit 17 (bit mask
+    131072) in *alerts*.
+: **obstruction_map_reset** : Alert corresponding with bit 18 (bit mask
+    262144) in *alerts*.
 
 Location data
 -------------
@@ -210,16 +222,7 @@ representing the value over time, ending at the current time.
     the sample period. When true, ping drop shows as "Obstructed" in the
     Starlink app.
     **OBSOLETE**: The user terminal no longer provides this data.
-
-There is no specific data field in the raw history data that directly
-correlates with "Other" or "Beta downtime" in the Starlink app (or whatever it
-gets renamed to after beta), but empirical evidence suggests any sample where
-*pop_ping_drop_rate* is 1, *scheduled* is true, and *obstructed* is false is
-counted as "Beta downtime".
-
-Note that neither *scheduled*=false nor *obstructed*=true necessarily means
-packet loss occurred. Those need to be examined in combination with
-*pop_ping_drop_rate* to be meaningful.
+: **power_w** : Power consumed during the sample period, in watts.
 
 General ping drop history statistics
 ------------------------------------
@@ -371,6 +374,25 @@ period.
     during the sample period.
 : **upload_usage** : Total number of bytes uploaded from the user terminal
     during the sample period.
+
+Power consumption statistics
+----------------------------
+This group of statistics characterize the electrical power consumption of the
+user terminal hardware over the sample period.
+
+Note: Not all user terminal hardware supports this functionality. On
+unsupported hardware, the values will all report as 0.0.
+
+: **latest_power** : The power consumption during the most recent sample, in
+    watts.
+: **mean_power** : The mean (average) power consumption over the sample
+    period, in watts.
+: **min_power** : The power consumption of the sample that used the least
+    power during the sample period, in watts.
+: **max_power** : The power consumption of the sample that used the most
+    power during the sample period, in watts.
+: **total_energy** : Total amount of energy used during the sample period, in
+    kilowatt-hours.
 """
 
 from itertools import chain
@@ -397,7 +419,7 @@ from spacex.api.device import dish_pb2
 REQUEST_TIMEOUT = 10
 
 HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_throughput_bps",
-                  "uplink_throughput_bps")
+                  "uplink_throughput_bps", "power_in")
 
 StatusDict = TypedDict(
     "StatusDict", {
@@ -421,6 +443,8 @@ StatusDict = TypedDict(
         "direction_azimuth": float,
         "direction_elevation": float,
         "is_snr_above_noise_floor": bool,
+        "gps_ready": bool,
+        "gps_enabled": bool,
     })
 
 ObstructionDict = TypedDict(
@@ -452,6 +476,7 @@ HistBulkDict = TypedDict(
         "snr": Sequence[Optional[float]],
         "scheduled": Sequence[Optional[bool]],
         "obstructed": Sequence[Optional[bool]],
+        "power_w": Sequence[float],
     })
 
 PingDropDict = TypedDict(
@@ -495,6 +520,15 @@ UsageDict = TypedDict("UsageDict", {
     "download_usage": int,
     "upload_usage": int,
 })
+
+PowerDict = TypedDict(
+    "PowerDict", {
+        "latest_power": Optional[float],
+        "mean_power": Optional[float],
+        "min_power": Optional[float],
+        "max_power": Optional[float],
+        "total_energy": float,
+    })
 
 # For legacy reasons, there is a slight difference between the field names
 # returned in the actual data vs the *_field_names functions. This is a map of
@@ -733,10 +767,33 @@ def status_data(
     Raises:
         GrpcError: Failed getting status info from the Starlink user terminal.
     """
+    if context is None:
+        context = ChannelContext()
+        context_created = True
+    else:
+        context_created = False
+
     try:
         status = get_status(context)
+        history = get_history(context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
+    finally:
+        if context_created:
+            context.close()
+
+    # Latency info in status response appears to be broken, not sure about
+    # ping drop info, so get those from history response instead
+    pop_ping_drop_rate = None
+    pop_ping_latency_ms = None
+    latest_range = _compute_sample_range(history, 1)[0]
+    for latest_index in latest_range:
+        pop_ping_drop_rate = history.pop_ping_drop_rate[latest_index]
+        try:
+            pop_ping_latency_ms = history.pop_ping_latency_ms[latest_index]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        break
 
     try:
         if status.HasField("outage"):
@@ -783,6 +840,7 @@ def status_data(
 
     device_info = getattr(status, "device_info", None)
     gps_stats = getattr(status, "gps_stats", None)
+    inhibit_gps = getattr(gps_stats, "inhibit_gps", None)
     return {
         "id": getattr(device_info, "id", None),
         "hardware_version": getattr(device_info, "hardware_version", None),
@@ -791,10 +849,10 @@ def status_data(
         "uptime": getattr(getattr(status, "device_state", None), "uptime_s", None),
         "snr": None,  # obsoleted in grpc service
         "seconds_to_first_nonempty_slot": getattr(status, "seconds_to_first_nonempty_slot", None),
-        "pop_ping_drop_rate": getattr(status, "pop_ping_drop_rate", None),
+        "pop_ping_drop_rate": pop_ping_drop_rate,
         "downlink_throughput_bps": getattr(status, "downlink_throughput_bps", None),
         "uplink_throughput_bps": getattr(status, "uplink_throughput_bps", None),
-        "pop_ping_latency_ms": getattr(status, "pop_ping_latency_ms", None),
+        "pop_ping_latency_ms": pop_ping_latency_ms,
         "alerts": alert_bits,
         "fraction_obstructed": getattr(obstruction_stats, "fraction_obstructed", None),
         "currently_obstructed": getattr(obstruction_stats, "currently_obstructed", None),
@@ -804,7 +862,8 @@ def status_data(
         "direction_azimuth": getattr(status, "boresight_azimuth_deg", None),
         "direction_elevation": getattr(status, "boresight_elevation_deg", None),
         "is_snr_above_noise_floor": getattr(status, "is_snr_above_noise_floor", None),
-        "gps_valid": getattr(gps_stats, "gps_valid", None),
+        "gps_ready": getattr(gps_stats, "gps_valid", None),
+        "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
         "gps_sats": getattr(gps_stats, "gps_sats", None),
     }, {
         "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
@@ -935,17 +994,19 @@ def history_stats_field_names():
         See module level docs regarding brackets in field names.
 
     Returns:
-        A tuple with 6 lists, with general data names, ping drop stat names,
+        A tuple with 7 lists, with general data names, ping drop stat names,
         ping drop run length stat names, ping latency stat names, loaded ping
-        latency stat names, and bandwidth usage stat names, in that order.
+        latency stat names, bandwidth usage stat names, and power consumption
+        stat names, in that order.
 
         Note:
             Additional lists may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
     """
     return (_field_names(HistGeneralDict), _field_names(PingDropDict), _field_names(PingDropRlDict),
-            _field_names(PingLatencyDict), _field_names(LoadedLatencyDict), _field_names(UsageDict))
+            _field_names(PingLatencyDict), _field_names(LoadedLatencyDict), _field_names(UsageDict),
+            _field_names(PowerDict))
 
 
 def history_stats_field_types():
@@ -955,17 +1016,19 @@ def history_stats_field_types():
     element in the sequence is returned, not the type of the sequence.
 
     Returns:
-        A tuple with 6 lists, with general data types, ping drop stat types,
+        A tuple with 7 lists, with general data types, ping drop stat types,
         ping drop run length stat types, ping latency stat types, loaded ping
-        latency stat types, and bandwidth usage stat types, in that order.
+        latency stat types, bandwidth usage stat types, and power consumption
+        stat types, in that order.
 
         Note:
             Additional lists may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
     """
     return (_field_types(HistGeneralDict), _field_types(PingDropDict), _field_types(PingDropRlDict),
-            _field_types(PingLatencyDict), _field_types(LoadedLatencyDict), _field_types(UsageDict))
+            _field_types(PingLatencyDict), _field_types(LoadedLatencyDict), _field_types(UsageDict),
+            _field_types(PowerDict))
 
 
 def get_history(context: Optional[ChannelContext] = None):
@@ -1182,6 +1245,7 @@ def history_bulk_data(parse_samples: int,
     pop_ping_latency_ms = []
     downlink_throughput_bps = []
     uplink_throughput_bps = []
+    power_w: List[Optional[float]] = []
 
     for i in sample_range:
         # pop_ping_drop_rate is checked in _compute_sample_range
@@ -1209,6 +1273,13 @@ def history_bulk_data(parse_samples: int,
             pass
         uplink_throughput_bps.append(uplink)
 
+        power = None
+        try:
+            power = history.power_in[i]
+        except (AttributeError, IndexError, TypeError):
+            pass
+        power_w.append(power)
+
     return {
         "samples": parsed_samples,
         "end_counter": current,
@@ -1220,6 +1291,7 @@ def history_bulk_data(parse_samples: int,
         "snr": [None] * parsed_samples,  # obsoleted in grpc service
         "scheduled": [None] * parsed_samples,  # obsoleted in grpc service
         "obstructed": [None] * parsed_samples,  # obsoleted in grpc service
+        "power_w": power_w,
     }
 
 
@@ -1238,7 +1310,7 @@ def history_stats(
     context: Optional[ChannelContext] = None,
     history=None
 ) -> Tuple[HistGeneralDict, PingDropDict, PingDropRlDict, PingLatencyDict, LoadedLatencyDict,
-           UsageDict]:
+           UsageDict, PowerDict]:
     """Fetch, parse, and compute ping and usage stats.
 
     Note:
@@ -1257,15 +1329,15 @@ def history_stats(
             it, from a prior call to `get_history`.
 
     Returns:
-        A tuple with 6 dicts, mapping general data names, ping drop stat
+        A tuple with 7 dicts, mapping general data names, ping drop stat
         names, ping drop run length stat names, ping latency stat names,
-        loaded ping latency stat names, and bandwidth usage stat names to
-        their respective values, in that order.
+        loaded ping latency stat names, bandwidth usage stat names, and power
+        consumption stat names to their respective values, in that order.
 
         Note:
             Additional dicts may be added to this tuple in the future with
             additional data groups, so it not recommended for the caller to
-            assume exactly 6 elements.
+            assume exactly 7 elements.
 
     Raises:
         GrpcError: Failed getting history info from the Starlink user
@@ -1298,6 +1370,11 @@ def history_stats(
 
     usage_down = 0.0
     usage_up = 0.0
+
+    power_latest: Optional[float] = None
+    power_min: Optional[float] = None
+    power_max: Optional[float] = None
+    energy = 0.0
 
     rtt_full: List[float] = []
     rtt_all: List[Tuple[float, float]] = []
@@ -1351,6 +1428,17 @@ def history_stats(
                 rtt_buckets[0].append(rtt)
         if d < 1.0:
             rtt_all.append((rtt, 1.0 - d))
+
+        try:
+            power = history.power_in[i]
+            if power_min is None or power < power_min:
+                power_min = power
+            if power_max is None or power > power_max:
+                power_max = power
+            energy += power
+            power_latest = power
+        except (AttributeError, IndexError, TypeError):
+            pass
 
     # If the entire sample set is one big drop run, it will be both initial
     # fragment (continued from prior sample range) and final one (continued
@@ -1434,6 +1522,12 @@ def history_stats(
     }, {
         "download_usage": int(round(usage_down / 8)),
         "upload_usage": int(round(usage_up / 8)),
+    }, {
+        "latest_power": power_latest,
+        "mean_power": None if parsed_samples == 0 else energy / parsed_samples,
+        "min_power": power_min,
+        "max_power": power_max,
+        "total_energy": energy / 3600 / 1000,
     }
 
 
@@ -1489,6 +1583,33 @@ def obstruction_map(context: Optional[ChannelContext] = None):
         cols = map_data.num_cols
         return tuple((map_data.snr[i:i + cols]) for i in range(0, cols * map_data.num_rows, cols))
     except (AttributeError, IndexError, TypeError) as e:
+        raise GrpcError(e) from e
+
+
+def reset_obstruction_map(context: Optional[ChannelContext] = None):
+    """Reset obstruction map data.
+
+    This will cause the dish to discard the data it has collected about the
+    directions in which the satellite signal is obstructed and start over from
+    an empty map.
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(dish_clear_obstruction_map={}), timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
 
 
@@ -1618,5 +1739,35 @@ def set_sleep_config(start: int,
 
     try:
         call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
+        raise GrpcError(e) from e
+
+
+def set_gps_config(enable: bool, context: Optional[ChannelContext] = None) -> bool:
+    """Set sleep mode configuration.
+
+    Args:
+        enable (bool): Whether or not to use GPS for position data.
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Returns:
+        The newly set enable state.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(dish_inhibit_gps={"inhibit_gps": not enable}),
+                               timeout=REQUEST_TIMEOUT)
+        return not response.dish_inhibit_gps.inhibit_gps
+
+    try:
+        return call_with_channel(grpc_call, context=context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Poll and record service information from a gRPC reflection server
 
 This script will query a gRPC reflection server for descriptor information of

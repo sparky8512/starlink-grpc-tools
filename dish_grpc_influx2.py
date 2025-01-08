@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Write Starlink user terminal data to an InfluxDB 2.x database.
 
 This script pulls the current status info and/or metrics computed from the
@@ -12,6 +12,7 @@ measurement / series names:
 : spacex.starlink.user_terminal.history : Bulk history data
 : spacex.starlink.user_terminal.ping_stats : Ping history statistics
 : spacex.starlink.user_terminal.usage : Usage history statistics
+: spacex.starlink.user_terminal.power : Power history statistics
 
 NOTE: The Starlink user terminal does not include time values with its
 history or status data, so this script uses current system time to compute
@@ -220,7 +221,7 @@ def sync_timebase(opts, gstate):
 
 
 def loop_body(opts, gstate, shutdown=False):
-    fields = {"status": {}, "ping_stats": {}, "usage": {}}
+    fields = {"status": {}, "ping_stats": {}, "usage": {}, "power": {}}
 
     def cb_add_item(key, val, category):
         fields[category][key] = val

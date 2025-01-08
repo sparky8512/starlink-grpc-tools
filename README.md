@@ -3,7 +3,7 @@ This repository has a handful of tools for interacting with the [gRPC](https://g
 
 For more information on what Starlink is, see [starlink.com](https://www.starlink.com/) and/or the [r/Starlink subreddit](https://www.reddit.com/r/Starlink/).
 
-## Prerequisites
+## Prerequisites / Installation
 
 Most of the scripts here are [Python](https://www.python.org/) scripts. To use them, you will either need Python installed on your system or you can use the Docker image. If you use the Docker image, you can skip the rest of the prerequisites other than making sure the dish IP is reachable and Docker itself. For Linux systems, the python package from your distribution should be fine, as long as it is Python 3, version 3.7 or later.
 
@@ -13,7 +13,9 @@ Running the scripts within a [Docker](https://www.docker.com/) container require
 
 ### Required Python modules (for non-Docker usage)
 
-The easiest way to get the Python modules used by the scripts is to do the following, which will install latest versions of a superset of the required modules:
+The scripts require a number of Python modules to be present in your local Python environment. It is recommended to [create and use a virtual environment](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments) (venv) for this purpose, but usually not required. However, some OS distribution's Python installations may require the use of venv when running at `root`/`Administrator` user. If you don't want to deal with that, either install as a different user, or add the `--user` option after the word `install` in the following command, but be aware that will only make it available to that user.
+
+The easiest way to get the required modules is to run the following command, which will install latest versions of a superset of the required modules:
 ```shell script
 pip install --upgrade -r requirements.txt
 ```
@@ -42,8 +44,6 @@ This set of scripts includes `dish_grpc_text.py`, `dish_grpc_influx.py`, `dish_g
 return data in a format Prometheus can scrape.
 
 All these scripts support processing status data and/or history data in various modes. The status data is mostly what appears related to the dish in the Debug Data section of the Starlink app, whereas most of the data displayed in the Statistics page of the Starlink app comes from the history data. Specific status or history data groups can be selected by including their mode names on the command line. Run the scripts with `-h` command line option to get a list of available modes. See the documentation at the top of `starlink_grpc.py` for detail on what each of the fields means within each mode group.
-
-`dish_grpc_prometheus.py` only allows the modes `status`, `usage`, and `alert_detail`.
 
 For example, data from all the currently available status groups can be output by doing:
 ```shell script
@@ -88,7 +88,7 @@ python3 dish_obstruction_map.py -t 3600 obstructions_%s.png
 
 Run it with the `-h` command line option for full usage details, including control of the map colors and color modes.
 
-#### Reboot, stow, and sleep control
+#### Reboot, stow, sleep, and GPS control
 
 `dish_control.py` is a simple stand alone script that can issue reboot, stow, or unstow commands to the dish:
 ```shell script
@@ -102,6 +102,33 @@ These operations can also be done using `grpcurl`, thus avoiding the need to use
 ```shell script
 python3 dish_control.py set_sleep -h
 ```
+
+It can also tell the dish whether or not to use GPS for position data. You can get usage instructions for that by doing:
+```shell script
+python3 dish_control.py set_gps -h
+```
+**NOTE**: This has no impact on whether or not the location data can be polled (see [above section](#enabling-access-to-location-data)). It only instructs the dish whether or not to use GPS for its own purposes. If this is not meaningful to you, then you should probably not mess with this setting. Note also that this setting is not preserved across dish reboot, at which point it will reset to the default of GPS enabled.
+
+Finally, all the commands supported by this script can be run periodically, either by using the `-t` option most of the other scripts support, or the `-c` option to use the cron-like scheduler described in the [next section](#firmware-update-checking-and-triggering).
+
+#### Firmware update checking and triggering
+
+`dish_check_update.py` checks for pending dish software updates, and can optionally trigger the update by rebooting the dish if it detects one. This can be useful if your dish normally does its automatic software install reboots at a time you don't want. To simplify this use case, this script supports a cron-like scheduling option, in addition to the `-t` periodic interval loop scheduling that most of the other scripts support.
+
+To use the cron-like scheduler, add the `-c` command line option to specify the schedule, using the same string format cron uses for its crontab entries (`minute` `hour` `day_of_month` `month` `day_of_week`). By default, it will use system local timezone, including DST adjustment. To use a different timezone, use the `-m` option. For example, to check and trigger updates at 2:30am local time daily:
+```shell script
+python3 dish_check_update.py -c "30 2 * * *" --install
+```
+or same for specific timezone:
+```shell script
+python3 dish_check_update.py -c "30 2 * * *" -m "America/Los_Angeles" --install
+```
+or to immediately check without triggering install, you can do:
+```shell script
+python3 dish_check_update.py -v
+```
+
+Run with the `-h` command line option for full usage details. For more information on the cron schedule string format or timezone names, see the [croniter](https://github.com/kiorky/croniter) or [dateutil](https://github.com/dateutil/dateutil) project documentation, respectively.
 
 ### The JSON parser script
 
@@ -136,13 +163,13 @@ Possibly more simple examples to come, as the other scripts have started getting
 
 ## Running with Docker
 
-The supported docker image for this project is now the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools). This is a multi-arch image built for `linux/amd64` (x64_64) and `linux/arm64` (aarch64) docker platforms.
+The supported docker image for this project is the one hosted in the [GitHub Packages repository](https://github.com/sparky8512/starlink-grpc-tools/pkgs/container/starlink-grpc-tools). This is a multi-arch image built for `linux/amd64` (x64_64) and `linux/arm64` (aarch64) docker platforms.
 
 You can get the "latest" image with the following command:
 ```shell script
 docker pull ghcr.io/sparky8512/starlink-grpc-tools
 ```
-This will pull the image tagged as "latest". There should also be images for all recent tagged releases of this project, but those tend to be few and far between, so the most recent one may be missing some important changes. See the package repository for a full list of tagged images.
+This will pull the image tagged as "latest", which will be the latest image generated that has at least been sanity-tested to not be completely broken. There should also be images for all recent tagged releases of this project. See the package repository for a full list of tagged images.
 
 You can run it with the following:
 ```shell script
@@ -174,8 +201,6 @@ docker run -d -t --name=starlink-grpc-tools -e INFLUXDB_HOST={InfluxDB Hostname}
     ghcr.io/sparky8512/starlink-grpc-tools -v -t 60 status alert_detail
 ```
 The `-t` option to `docker run` will prevent Python from buffering the script's standard output and can be omitted if you don't care about seeing the verbose output in the container logs as soon as it is printed.
-
-If there is some problem with accessing the image from the GitHub Packages repository, there is also an image available on Docker Hub, which can be accessed as `neurocis/starlink-grpc-tools`, but note that that image may not be as up to date with changes as the supported one.
 
 ## Running with SystemD
 

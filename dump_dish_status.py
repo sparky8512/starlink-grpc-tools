@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Simple example of get_status request using grpc call directly."""
 
 import sys

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Output Starlink user terminal data info in text format.
 
 This script pulls the current status info and/or metrics computed from the
@@ -150,7 +150,7 @@ def print_header(opts, print_file):
 
     if opts.history_stats_mode:
         groups = starlink_grpc.history_stats_field_names()
-        general, ping, runlen, latency, loaded, usage = groups[0:6]
+        general, ping, runlen, latency, loaded, usage, power = groups[0:7]
         header_add(general)
         if "ping_drop" in opts.mode:
             header_add(ping)
@@ -162,6 +162,8 @@ def print_header(opts, print_file):
             header_add(loaded)
         if "usage" in opts.mode:
             header_add(usage)
+        if "power" in opts.mode:
+            header_add(power)
 
     print(",".join(header), file=print_file)
     return 0

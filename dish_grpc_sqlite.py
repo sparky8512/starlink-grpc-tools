@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Write Starlink user terminal data to a sqlite database.
 
 This script pulls the current status info and/or metrics computed from the
@@ -10,7 +10,8 @@ Requested data will be written into the following tables:
 : status : Current status data
 : history : Bulk history data
 : ping_stats : Ping history statistics
-: usage : Usage history statistics
+: usage : Bandwidth usage history statistics
+: power : Power consumption history statistics
 
 Array data is currently written to the database as text strings of comma-
 separated values, which may not be the best method for some use cases. If you
@@ -46,7 +47,7 @@ import time
 import dish_common
 import starlink_grpc
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 class Terminated(Exception):
@@ -100,7 +101,7 @@ def query_counter(opts, gstate, column, table):
 
 
 def loop_body(opts, gstate, shutdown=False):
-    tables = {"status": {}, "ping_stats": {}, "usage": {}}
+    tables = {"status": {}, "ping_stats": {}, "usage": {}, "power": {}}
     hist_cols = ["time", "id"]
     hist_rows = []
 
@@ -218,6 +219,7 @@ def create_tables(conn, context, suffix):
     type_groups = starlink_grpc.history_stats_field_types()
     tables["ping_stats"] = zip(name_groups[0:5], type_groups[0:5])
     tables["usage"] = ((name_groups[5], type_groups[5]),)
+    tables["power"] = ((name_groups[6], type_groups[6]),)
 
     name_groups = starlink_grpc.history_bulk_field_names()
     type_groups = starlink_grpc.history_bulk_field_types()
@@ -262,14 +264,19 @@ def convert_tables(conn, context):
     old_cur = conn.cursor()
     new_cur = conn.cursor()
     for table, new_columns in new_column_info.items():
-        old_cur.execute('SELECT * FROM "{0}"'.format(table))
-        old_columns = set(x[0] for x in old_cur.description)
-        new_columns = tuple(x for x in new_columns if x in old_columns)
-        sql = 'INSERT OR REPLACE INTO "{0}_new" ({1}) VALUES ({2})'.format(
-            table, ",".join('"' + x + '"' for x in new_columns),
-            ",".join(repeat("?", len(new_columns))))
-        new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
-        new_cur.execute('DROP TABLE "{0}"'.format(table))
+        try:
+            old_cur.execute('SELECT * FROM "{0}"'.format(table))
+            table_ok = True
+        except sqlite3.OperationalError:
+            table_ok = False
+        if table_ok:
+            old_columns = set(x[0] for x in old_cur.description)
+            new_columns = tuple(x for x in new_columns if x in old_columns)
+            sql = 'INSERT OR REPLACE INTO "{0}_new" ({1}) VALUES ({2})'.format(
+                table, ",".join('"' + x + '"' for x in new_columns),
+                ",".join(repeat("?", len(new_columns))))
+            new_cur.executemany(sql, (tuple(row[col] for col in new_columns) for row in old_cur))
+            new_cur.execute('DROP TABLE "{0}"'.format(table))
         new_cur.execute('ALTER TABLE "{0}_new" RENAME TO "{0}"'.format(table))
     old_cur.close()
     new_cur.close()
