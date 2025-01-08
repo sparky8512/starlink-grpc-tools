@@ -88,7 +88,6 @@ METRICS_INFO = {
     "power_min_power": MetricInfo(),
     "power_max_power": MetricInfo(),
     "power_total_energy": MetricInfo(),
-
 }
 
 STATE_VALUES = [
