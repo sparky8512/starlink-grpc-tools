@@ -44,7 +44,7 @@ METRICS_INFO = {
     "status_longitude": MetricInfo(),
     "status_latitude": MetricInfo(),
     "status_altitude": MetricInfo(),
-    "status_gps_valid": MetricInfo(),
+    "status_gps_ready": MetricInfo(),
     "status_gps_sats": MetricInfo(),
     "status_seconds_to_first_nonempty_slot": MetricInfo(),
     "status_pop_ping_drop_rate": MetricInfo(),
