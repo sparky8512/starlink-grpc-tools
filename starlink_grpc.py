@@ -88,6 +88,7 @@ This group holds information about the current state of the user terminal.
     to use GPS for position data.
 : **gps_enabled** : Boolean indicating whether or not the user terminal will
     use GPS for position data if and when it becomes ready.
+: **gps_sats** : Number of satellites actively being used.
 
 Obstruction detail status data
 ------------------------------
@@ -445,6 +446,7 @@ StatusDict = TypedDict(
         "is_snr_above_noise_floor": bool,
         "gps_ready": bool,
         "gps_enabled": bool,
+        "gps_sats": int,
     })
 
 ObstructionDict = TypedDict(
@@ -864,6 +866,7 @@ def status_data(
         "is_snr_above_noise_floor": getattr(status, "is_snr_above_noise_floor", None),
         "gps_ready": getattr(gps_stats, "gps_valid", None),
         "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
+        "gps_sats": getattr(gps_stats, "gps_sats", None),
     }, {
         "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service

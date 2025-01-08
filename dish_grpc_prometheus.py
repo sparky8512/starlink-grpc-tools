@@ -44,6 +44,9 @@ METRICS_INFO = {
     "status_longitude": MetricInfo(),
     "status_latitude": MetricInfo(),
     "status_altitude": MetricInfo(),
+    "status_gps_enabled": MetricInfo(),
+    "status_gps_ready": MetricInfo(),
+    "status_gps_sats": MetricInfo(),
     "status_seconds_to_first_nonempty_slot": MetricInfo(),
     "status_pop_ping_drop_rate": MetricInfo(),
     "status_downlink_throughput_bps": MetricInfo(),
@@ -74,11 +77,17 @@ METRICS_INFO = {
     "status_alert_moving_too_fast_for_policy": MetricInfo(),
     "status_alert_dbf_telem_stale": MetricInfo(),
     "status_alert_low_motor_current": MetricInfo(),
+    "status_alert_obstruction_map_reset": MetricInfo(),
     "status_alert_lower_signal_than_predicted": MetricInfo(),
     "ping_stats_samples": MetricInfo(kind="counter"),
     "ping_stats_end_counter": MetricInfo(kind="counter"),
     "usage_download_usage": MetricInfo(unit="bytes", kind="counter"),
     "usage_upload_usage": MetricInfo(unit="bytes", kind="counter"),
+    "power_latest_power": MetricInfo(),
+    "power_mean_power": MetricInfo(),
+    "power_min_power": MetricInfo(),
+    "power_max_power": MetricInfo(),
+    "power_total_energy": MetricInfo(),
 }
 
 STATE_VALUES = [
@@ -151,7 +160,7 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location"])
+    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location", "power"])
 
 
 def prometheus_export(opts, gstate):
