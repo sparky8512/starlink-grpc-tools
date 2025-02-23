@@ -1750,3 +1750,76 @@ def set_gps_config(enable: bool, context: Optional[ChannelContext] = None) -> bo
         return call_with_channel(grpc_call, context=context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
+
+
+def get_tilt_config(context: Optional[ChannelContext] = None) -> Tuple[bool, bool]:
+    """Get current dish tilt/level mode configuration.
+
+    This function retrieves the current tilt/level mode settings from the Starlink user terminal.
+    The settings control how the dish positions itself:
+    - force_level: When True, keeps the dish level (parallel to the ground)
+    - tilt_like_normal: When True, allows the dish to automatically adjust its tilt 
+      angle for optimal signal reception (default behavior)
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Returns:
+        A tuple with two bools:
+        - force_level: True if dish is forced to stay level, False otherwise
+        - tilt_like_normal: True if dish can tilt normally, False otherwise
+        Note: Typically only one of these will be True at a time
+
+    Raises:
+        GrpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
+    """
+    def grpc_call(channel: grpc.Channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(dish_get_config={}), timeout=REQUEST_TIMEOUT)
+        return response.dish_get_config.dish_config
+
+    config = call_with_channel(grpc_call, context=context)
+    mode = getattr(config, "level_dish_mode", 0)  # Default to TILT_LIKE_NORMAL (0)
+    return (mode == 1, mode == 0)  # (force_level, tilt_like_normal)
+
+
+def set_tilt_config(force_level: bool = False, context: Optional[ChannelContext] = None) -> None:
+    """Set dish tilt/level mode configuration.
+
+    This function configures how the dish positions itself:
+    - When force_level is True, forces the dish to stay level (parallel to ground)
+    - When force_level is False (default), removes the level mode setting, allowing
+      the dish to return to its normal tilt behavior
+
+    Args:
+        force_level (bool): Whether or not to force the dish to stay level (parallel
+            to the ground). When False (default), removes level mode setting.
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        config = {"apply_level_dish_mode": True}
+        if force_level:
+            config["level_dish_mode"] = 1
+        request = device_pb2.Request(dish_config=config)
+        stub.Handle(request, timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
+        raise GrpcError(e) from e
