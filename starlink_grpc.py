@@ -1753,13 +1753,13 @@ def set_gps_config(enable: bool, context: Optional[ChannelContext] = None) -> bo
 
 
 def get_tilt_config(context: Optional[ChannelContext] = None) -> Tuple[bool, bool]:
-    """Get current tilt mode configuration.
+    """Get current dish tilt/level mode configuration.
 
-    This function retrieves the current tilt mode settings from the Starlink user terminal.
+    This function retrieves the current tilt/level mode settings from the Starlink user terminal.
     The settings control how the dish positions itself:
-    - flat_mode: When enabled, keeps the dish parallel to the ground
-    - automatic_tilt: When enabled, allows the dish to automatically adjust its tilt 
-      angle for optimal signal reception
+    - force_level: When True, keeps the dish level (parallel to the ground)
+    - tilt_like_normal: When True, allows the dish to automatically adjust its tilt 
+      angle for optimal signal reception (default behavior)
 
     Args:
         context (ChannelContext): Optionally provide a channel for reuse
@@ -1769,8 +1769,9 @@ def get_tilt_config(context: Optional[ChannelContext] = None) -> Tuple[bool, boo
 
     Returns:
         A tuple with two bools:
-        - flat_mode: True if flat mode is enabled, False otherwise
-        - automatic_tilt: True if automatic tilt adjustment is enabled, False otherwise
+        - force_level: True if dish is forced to stay level, False otherwise
+        - tilt_like_normal: True if dish can tilt normally, False otherwise
+        Note: Typically only one of these will be True at a time
 
     Raises:
         GrpcError: Communication or service error.
@@ -1786,29 +1787,23 @@ def get_tilt_config(context: Optional[ChannelContext] = None) -> Tuple[bool, boo
         return response.dish_get_config.dish_config
 
     config = call_with_channel(grpc_call, context=context)
-    return (config.flat_mode, config.automatic_tilt)
+    mode = getattr(config, "level_dish_mode", 0)  # Default to TILT_LIKE_NORMAL (0)
+    return (mode == 1, mode == 0)  # (force_level, tilt_like_normal)
 
 
-def set_tilt_config(flat_mode: bool = False, automatic: bool = True, context: Optional[ChannelContext] = None) -> None:
-    """Set tilt mode configuration.
+def set_tilt_config(force_level: bool = False, context: Optional[ChannelContext] = None) -> None:
+    """Set dish tilt/level mode configuration.
 
-    This function configures how the dish positions itself. It allows control of two settings:
-    - flat_mode: When enabled, keeps the dish parallel to the ground. This can be useful
-      in situations where you want to minimize the dish's visual impact or need it to
-      maintain a specific orientation.
-    - automatic_tilt: When enabled, allows the dish to automatically adjust its tilt
-      angle to optimize signal reception. This is typically the recommended setting
-      unless you have specific needs that require manual control.
+    This function configures how the dish positions itself:
+    - When force_level is True, forces the dish to stay level (parallel to ground)
+    - When force_level is False (default), removes the level mode setting, allowing
+      the dish to return to its normal tilt behavior
 
     Args:
-        flat_mode (bool): Whether or not to enable flat mode. When True, the dish
-            will position itself parallel to the ground. Defaults to False.
-        automatic (bool): Whether or not to enable automatic tilt adjustment. When
-            True, the dish will automatically optimize its tilt angle. Defaults to True.
+        force_level (bool): Whether or not to force the dish to stay level (parallel
+            to the ground). When False (default), removes level mode setting.
         context (ChannelContext): Optionally provide a channel for reuse
-            across repeated calls. If an existing channel is reused, the RPC
-            call will be retried at most once, since connectivity may have
-            been lost and restored in the time since it was last used.
+            across repeated calls.
 
     Raises:
         GrpcError: Communication or service error.
@@ -1817,12 +1812,11 @@ def set_tilt_config(flat_mode: bool = False, automatic: bool = True, context: Op
         if imports_pending:
             resolve_imports(channel)
         stub = device_pb2_grpc.DeviceStub(channel)
-        stub.Handle(device_pb2.Request(
-            dish_config={
-                "flat_mode": flat_mode,
-                "automatic_tilt": automatic
-            }),
-            timeout=REQUEST_TIMEOUT)
+        config = {"apply_level_dish_mode": True}
+        if force_level:
+            config["level_dish_mode"] = 1
+        request = device_pb2.Request(dish_config=config)
+        stub.Handle(request, timeout=REQUEST_TIMEOUT)
         # response is empty message in this case, so just ignore it
 
     try:
