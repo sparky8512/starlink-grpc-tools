@@ -109,6 +109,35 @@ python3 dish_control.py set_gps -h
 ```
 **NOTE**: This has no impact on whether or not the location data can be polled (see [above section](#enabling-access-to-location-data)). It only instructs the dish whether or not to use GPS for its own purposes. If this is not meaningful to you, then you should probably not mess with this setting. Note also that this setting is not preserved across dish reboot, at which point it will reset to the default of GPS enabled.
 
+It can also control the dish's tilt mode settings. You can get usage instructions for that by doing:
+```shell script
+python3 dish_control.py set_tilt -h
+```
+The tilt control allows you to:
+- Enable/disable flat mode: When enabled, keeps the dish parallel to the ground
+- Enable/disable automatic tilt: When enabled, allows the dish to automatically adjust its tilt angle for optimal signal
+
+For example:
+```shell script
+# Show current tilt settings
+python3 dish_control.py set_tilt
+
+# Enable flat mode
+python3 dish_control.py set_tilt --flat
+
+# Disable flat mode
+python3 dish_control.py set_tilt --no-flat
+
+# Enable automatic tilt adjustment
+python3 dish_control.py set_tilt --automatic
+
+# Disable automatic tilt adjustment
+python3 dish_control.py set_tilt --no-automatic
+
+# Set both options at once
+python3 dish_control.py set_tilt --flat --no-automatic
+```
+
 Finally, all the commands supported by this script can be run periodically, either by using the `-t` option most of the other scripts support, or the `-c` option to use the cron-like scheduler described in the [next section](#firmware-update-checking-and-triggering).
 
 #### Firmware update checking and triggering

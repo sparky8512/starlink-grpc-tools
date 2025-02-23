@@ -1750,3 +1750,82 @@ def set_gps_config(enable: bool, context: Optional[ChannelContext] = None) -> bo
         return call_with_channel(grpc_call, context=context)
     except (AttributeError, ValueError, grpc.RpcError) as e:
         raise GrpcError(e) from e
+
+
+def get_tilt_config(context: Optional[ChannelContext] = None) -> Tuple[bool, bool]:
+    """Get current tilt mode configuration.
+
+    This function retrieves the current tilt mode settings from the Starlink user terminal.
+    The settings control how the dish positions itself:
+    - flat_mode: When enabled, keeps the dish parallel to the ground
+    - automatic_tilt: When enabled, allows the dish to automatically adjust its tilt 
+      angle for optimal signal reception
+
+    Args:
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Returns:
+        A tuple with two bools:
+        - flat_mode: True if flat mode is enabled, False otherwise
+        - automatic_tilt: True if automatic tilt adjustment is enabled, False otherwise
+
+    Raises:
+        GrpcError: Communication or service error.
+        AttributeError, ValueError: Protocol error. Either the target is not a
+            Starlink user terminal or the grpc protocol has changed in a way
+            this module cannot handle.
+    """
+    def grpc_call(channel: grpc.Channel):
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        response = stub.Handle(device_pb2.Request(dish_get_config={}), timeout=REQUEST_TIMEOUT)
+        return response.dish_get_config.dish_config
+
+    config = call_with_channel(grpc_call, context=context)
+    return (config.flat_mode, config.automatic_tilt)
+
+
+def set_tilt_config(flat_mode: bool = False, automatic: bool = True, context: Optional[ChannelContext] = None) -> None:
+    """Set tilt mode configuration.
+
+    This function configures how the dish positions itself. It allows control of two settings:
+    - flat_mode: When enabled, keeps the dish parallel to the ground. This can be useful
+      in situations where you want to minimize the dish's visual impact or need it to
+      maintain a specific orientation.
+    - automatic_tilt: When enabled, allows the dish to automatically adjust its tilt
+      angle to optimize signal reception. This is typically the recommended setting
+      unless you have specific needs that require manual control.
+
+    Args:
+        flat_mode (bool): Whether or not to enable flat mode. When True, the dish
+            will position itself parallel to the ground. Defaults to False.
+        automatic (bool): Whether or not to enable automatic tilt adjustment. When
+            True, the dish will automatically optimize its tilt angle. Defaults to True.
+        context (ChannelContext): Optionally provide a channel for reuse
+            across repeated calls. If an existing channel is reused, the RPC
+            call will be retried at most once, since connectivity may have
+            been lost and restored in the time since it was last used.
+
+    Raises:
+        GrpcError: Communication or service error.
+    """
+    def grpc_call(channel: grpc.Channel) -> None:
+        if imports_pending:
+            resolve_imports(channel)
+        stub = device_pb2_grpc.DeviceStub(channel)
+        stub.Handle(device_pb2.Request(
+            dish_config={
+                "flat_mode": flat_mode,
+                "automatic_tilt": automatic
+            }),
+            timeout=REQUEST_TIMEOUT)
+        # response is empty message in this case, so just ignore it
+
+    try:
+        call_with_channel(grpc_call, context=context)
+    except (AttributeError, ValueError, grpc.RpcError) as e:
+        raise GrpcError(e) from e

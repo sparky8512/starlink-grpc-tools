@@ -41,6 +41,29 @@ def parse_args():
     gps_parser.add_argument("--enable",
                             action=argparse.BooleanOptionalAction,
                             help="Enable/disable use of GPS for position data")
+    tilt_parser = subs.add_parser(
+        "set_tilt",
+        help="Show, set, or configure dish tilt mode",
+        description="""Control the dish's tilt mode settings.
+        
+Without arguments, shows the current tilt mode configuration.
+With arguments, configures how the dish positions itself:
+
+--flat: When enabled, keeps the dish parallel to the ground
+--automatic: When enabled, allows automatic tilt angle adjustment for optimal signal
+
+Examples:
+  %(prog)s             Show current settings
+  %(prog)s --flat      Enable flat mode
+  %(prog)s --no-flat   Disable flat mode
+  %(prog)s --automatic Enable automatic tilt
+  %(prog)s --no-automatic Disable automatic tilt""")
+    tilt_parser.add_argument("--flat",
+                            action=argparse.BooleanOptionalAction,
+                            help="Enable/disable flat mode")
+    tilt_parser.add_argument("--automatic",
+                            action=argparse.BooleanOptionalAction,
+                            help="Enable/disable automatic tilt adjustment")
     loop_util.add_args(parser)
 
     opts = parser.parse_args()
@@ -92,6 +115,14 @@ def loop_body(opts):
                     request = request_class(get_status={})
                 else:
                     request = request_class(dish_inhibit_gps={"inhibit_gps": not opts.enable})
+            elif opts.command == "set_tilt":
+                if opts.flat is None and opts.automatic is None:
+                    request = request_class(dish_get_config={})
+                else:
+                    request = request_class(dish_config={
+                        "flat_mode": opts.flat if opts.flat is not None else False,
+                        "automatic_tilt": opts.automatic if opts.automatic is not None else True
+                    })
 
             response = stub.Handle(request, timeout=10)
 
@@ -109,6 +140,10 @@ def loop_body(opts):
                     print("GPS disabled")
                 else:
                     print("GPS enabled")
+            elif opts.command == "set_tilt" and opts.flat is None and opts.automatic is None:
+                config = response.dish_get_config.dish_config
+                print("Flat mode:", "enabled" if config.flat_mode else "disabled")
+                print("Automatic tilt:", "enabled" if config.automatic_tilt else "disabled")
     except (AttributeError, ValueError, grpc.RpcError) as e:
         if isinstance(e, grpc.Call):
             msg = e.details()
