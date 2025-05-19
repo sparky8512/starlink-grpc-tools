@@ -405,7 +405,7 @@ from typing_extensions import TypedDict, get_args
 import grpc
 
 try:
-    from yagrc import importer
+    from yagrc import importer, reflector
     importer.add_lazy_packages(["spacex_api.device"])
     imports_pending = True
 except (ImportError, AttributeError):
@@ -569,7 +569,19 @@ def _field_types(hint_type):
 
 
 def resolve_imports(channel: grpc.Channel):
-    importer.resolve_lazy_imports(channel)
+    try:
+        importer.resolve_lazy_imports(channel)
+    except reflector.ServiceError:
+        # "temporary" backwards compatibility hack: try old package name
+        bchack_importer = importer.GrpcImporter()
+        bchack_importer.configure(channel, filenames=["spacex/api/device/device.proto", "spacex/api/device/dish.proto"])
+        global device_pb2
+        global device_pb2_grpc
+        global dish_pb2
+        from spacex.api.device import device_pb2
+        from spacex.api.device import device_pb2_grpc
+        from spacex.api.device import dish_pb2
+        # end backwards compatibility hack
     global imports_pending
     imports_pending = False
 
