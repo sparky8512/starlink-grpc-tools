@@ -11,8 +11,7 @@ it will print the results in CSV format.
 """
 
 import argparse
-from datetime import datetime
-from datetime import timezone
+import datetime
 import logging
 import re
 import sys
@@ -120,11 +119,11 @@ def parse_args():
         except ValueError:
             try:
                 opts.history_time = int(
-                    datetime.strptime(opts.timestamp, "%Y-%m-%d_%H:%M:%S").timestamp())
+                    datetime.datetime.strptime(opts.timestamp, "%Y-%m-%d_%H:%M:%S").timestamp())
             except ValueError:
                 parser.error("Could not parse timestamp")
         if opts.verbose:
-            print("Using timestamp", datetime.fromtimestamp(opts.history_time, tz=timezone.utc))
+            print("Using timestamp", datetime.datetime.fromtimestamp(opts.history_time, tz=datetime.timezone.utc))
 
     return opts
 
@@ -207,7 +206,7 @@ def get_data(opts, add_item, add_sequence, add_bulk):
         new_counter = general["end_counter"]
         if opts.verbose:
             print("Establishing time base: {0} -> {1}".format(
-                new_counter, datetime.fromtimestamp(timestamp, tz=timezone.utc)))
+                new_counter, datetime.datetime.fromtimestamp(timestamp, tz=datetime.timezone.utc)))
         timestamp -= parsed_samples
 
         add_bulk(bulk, parsed_samples, timestamp, new_counter - parsed_samples)
@@ -220,7 +219,7 @@ def loop_body(opts):
         csv_data = []
     else:
         history_time = int(time.time()) if opts.history_time is None else opts.history_time
-        csv_data = [datetime.utcfromtimestamp(history_time).isoformat()]
+        csv_data = [datetime.datetime.fromtimestamp(history_time, datetime.timezone.utc).isoformat()]
 
     def cb_data_add_item(name, val):
         if opts.verbose:
@@ -242,14 +241,14 @@ def loop_body(opts):
     def cb_add_bulk(bulk, count, timestamp, counter):
         if opts.verbose:
             print("Time range (UTC):      {0} -> {1}".format(
-                datetime.utcfromtimestamp(timestamp).isoformat(),
-                datetime.utcfromtimestamp(timestamp + count).isoformat()))
+                datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).isoformat(),
+                datetime.datetime.fromtimestamp(timestamp + count, datetime.timezone.utc).isoformat()))
             for key, val in bulk.items():
                 print("{0:22} {1}".format(key + ":", ", ".join(str(subval) for subval in val)))
         else:
             for i in range(count):
                 timestamp += 1
-                fields = [datetime.utcfromtimestamp(timestamp).isoformat()]
+                fields = [datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).isoformat()]
                 fields.extend(["" if val[i] is None else str(val[i]) for val in bulk.values()])
                 print(",".join(fields))
 

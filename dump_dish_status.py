@@ -6,8 +6,8 @@ import sys
 import grpc
 
 try:
-    from spacex.api.device import device_pb2
-    from spacex.api.device import device_pb2_grpc
+    from spacex_api.device import device_pb2
+    from spacex_api.device import device_pb2_grpc
 except ModuleNotFoundError:
     print("This script requires the generated gRPC protocol modules. See README file for details.",
           file=sys.stderr)

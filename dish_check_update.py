@@ -15,9 +15,9 @@ import grpc
 import loop_util
 import starlink_grpc
 
-# This is the enum value spacex.api.device.dish_pb2.SoftwareUpdateState.REBOOT_REQUIRED
+# This is the enum value spacex_api.device.dish_pb2.SoftwareUpdateState.REBOOT_REQUIRED
 REBOOT_REQUIRED = 6
-# This is the enum value spacex.api.device.dish_pb2.SoftwareUpdateState.DISABLED
+# This is the enum value spacex_api.device.dish_pb2.SoftwareUpdateState.DISABLED
 UPDATE_DISABLED = 7
 
 

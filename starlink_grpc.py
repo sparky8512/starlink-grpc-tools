@@ -406,14 +406,14 @@ import grpc
 
 try:
     from yagrc import importer
-    importer.add_lazy_packages(["spacex.api.device"])
+    importer.add_lazy_packages(["spacex_api.device"])
     imports_pending = True
 except (ImportError, AttributeError):
     imports_pending = False
 
-from spacex.api.device import device_pb2
-from spacex.api.device import device_pb2_grpc
-from spacex.api.device import dish_pb2
+from spacex_api.device import device_pb2
+from spacex_api.device import device_pb2_grpc
+from spacex_api.device import dish_pb2
 
 # Max wait time for gRPC request completion, in seconds. This is just to
 # prevent hang if the connection goes dead without closing.
