@@ -219,7 +219,7 @@ def loop_body(opts):
         csv_data = []
     else:
         history_time = int(time.time()) if opts.history_time is None else opts.history_time
-        csv_data = [datetime.datetime.fromtimestamp(history_time, datetime.timezone.utc).isoformat()]
+        csv_data = [datetime.datetime.fromtimestamp(history_time, datetime.timezone.utc).replace(tzinfo=None).isoformat()]
 
     def cb_data_add_item(name, val):
         if opts.verbose:
@@ -241,14 +241,14 @@ def loop_body(opts):
     def cb_add_bulk(bulk, count, timestamp, counter):
         if opts.verbose:
             print("Time range (UTC):      {0} -> {1}".format(
-                datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).isoformat(),
-                datetime.datetime.fromtimestamp(timestamp + count, datetime.timezone.utc).isoformat()))
+                datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).replace(tzinfo=None).isoformat(),
+                datetime.datetime.fromtimestamp(timestamp + count, datetime.timezone.utc).replace(tzinfo=None).isoformat()))
             for key, val in bulk.items():
                 print("{0:22} {1}".format(key + ":", ", ".join(str(subval) for subval in val)))
         else:
             for i in range(count):
                 timestamp += 1
-                fields = [datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).isoformat()]
+                fields = [datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).replace(tzinfo=None).isoformat()]
                 fields.extend(["" if val[i] is None else str(val[i]) for val in bulk.values()])
                 print(",".join(fields))
 
