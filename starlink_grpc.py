@@ -153,22 +153,29 @@ their nature, but the field names are pretty self-explanatory.
     1024) in *alerts*.
 : **alert_moving_while_not_mobile** : Alert corresponding with bit 11 (bit mask
     2048) in *alerts*.
+    **OBSOLETE**: This alert is no longer generated.
 : **alert_moving_fast_while_not_aviation** : Alert corresponding with bit 12
     (bit mask 4096) in *alerts*.
-    **OBSOLETE**: This alert is no longer generated, presumably in preference
-    of *alert_moving_too_fast_for_policy*.
+    **OBSOLETE**: This alert is no longer generated.
 : **alert_dbf_telem_stale** : Alert corresponding with bit 13 (bit mask 8192)
     in *alerts*.
 : **alert_moving_too_fast_for_policy** : Alert corresponding with bit 14 (bit
     mask 16384) in *alerts*.
+    **OBSOLETE**: This alert is no longer generated.
 : **alert_low_motor_current** : Alert corresponding with bit 15 (bit mask
     32768) in *alerts*.
-: **lower_signal_than_predicted** : Alert corresponding with bit 16 (bit mask
-    65536) in *alerts*.
-: **slow_ethernet_speeds_100** : Alert corresponding with bit 17 (bit mask
-    131072) in *alerts*.
-: **obstruction_map_reset** : Alert corresponding with bit 18 (bit mask
+: **alert_lower_signal_than_predicted** : Alert corresponding with bit 16 (bit
+    mask 65536) in *alerts*.
+: **alert_slow_ethernet_speeds_100** : Alert corresponding with bit 17 (bit
+    mask 131072) in *alerts*.
+: **alert_obstruction_map_reset** : Alert corresponding with bit 18 (bit mask
     262144) in *alerts*.
+: **alert_dish_water_detected** : Alert corresponding with bit 19 (bit mask
+    524288) in *alerts*.
+: **alert_router_water_detected** : Alert corresponding with bit 20 (bit mask
+    1048576) in *alerts*.
+: **alert_upsu_router_port_slow** : Alert corresponding with bit 21 (bit mask
+    2097152) in *alerts*.
 
 Location data
 -------------
