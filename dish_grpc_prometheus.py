@@ -81,6 +81,8 @@ METRICS_INFO = {
     "status_alert_lower_signal_than_predicted": MetricInfo(),
     "ping_stats_samples": MetricInfo(kind="counter"),
     "ping_stats_end_counter": MetricInfo(kind="counter"),
+    "ping_stats_total_ping_drop": MetricInfo(),
+    "ping_stats_count_full_ping_drop": MetricInfo(),
     "usage_download_usage": MetricInfo(unit="bytes", kind="counter"),
     "usage_upload_usage": MetricInfo(unit="bytes", kind="counter"),
     "power_latest_power": MetricInfo(),
@@ -160,7 +162,8 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location", "power"])
+    return dish_common.run_arg_parser(
+        parser, modes=["status", "alert_detail", "usage", "location", "power", "ping_drop"])
 
 
 def prometheus_export(opts, gstate):
@@ -179,10 +182,15 @@ def prometheus_export(opts, gstate):
 
     metrics = []
 
-    # snr is not supported by starlink any more but still returned by the grpc
-    # service for backwards compatibility
-    if "status_snr" in raw_data:
-        del raw_data["status_snr"]
+    # these are not supported by starlink any more but still returned by
+    # starlink_grpc for backwards compatibility
+    for name in ("status_snr", "ping_stats_count_obstructed",
+                 "ping_stats_total_obstructed_ping_drop",
+                 "ping_stats_count_full_obstructed_ping_drop", "ping_stats_count_unscheduled",
+                 "ping_stats_total_unscheduled_ping_drop",
+                 "ping_stats_count_full_unscheduled_ping_drop"):
+        if name in raw_data:
+            del raw_data[name]
 
     metrics.append(
         Metric(
