@@ -61,6 +61,12 @@ python3 dish_grpc_influx.py -t 30 [... probably other args to specify server opt
 
 The exception to this is `dish_grpc_prometheus.py`, for which the timing interval is determined by whatever is polling the HTTP page it exports.
 
+`dish_grpc_prometheus.py` supports the same status and history stats modes as the other scripts. In particular, include the `ping_drop` mode to also export ping drop statistics, which can be useful for tracking packet loss in Grafana:
+```shell script
+python3 dish_grpc_prometheus.py status ping_drop
+```
+The packet loss ratio over the reported sample window can be computed as `starlink_ping_stats_total_ping_drop / starlink_ping_stats_samples`. By default the statistics cover the dish's 15 minute history buffer. Note that for `dish_grpc_prometheus.py` the collection interval is determined by how often the exported HTTP page is polled, so the `-t`/`-o` loop options do not apply here (see the [Polling interval](#polling-interval) section for the scripts that do use them).
+
 Some of the scripts (currently only the InfluxDB and MQTT ones) also support specifying options through environment variables. See details in the scripts for the environment variables that map to options.
 
 #### Bulk history data collection

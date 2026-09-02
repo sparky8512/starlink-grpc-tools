@@ -81,6 +81,14 @@ METRICS_INFO = {
     "status_alert_lower_signal_than_predicted": MetricInfo(),
     "ping_stats_samples": MetricInfo(kind="counter"),
     "ping_stats_end_counter": MetricInfo(kind="counter"),
+    "ping_stats_total_ping_drop": MetricInfo(kind="counter"),
+    "ping_stats_count_full_ping_drop": MetricInfo(kind="counter"),
+    "ping_stats_count_obstructed": MetricInfo(kind="counter"),
+    "ping_stats_total_obstructed_ping_drop": MetricInfo(kind="counter"),
+    "ping_stats_count_full_obstructed_ping_drop": MetricInfo(kind="counter"),
+    "ping_stats_count_unscheduled": MetricInfo(kind="counter"),
+    "ping_stats_total_unscheduled_ping_drop": MetricInfo(kind="counter"),
+    "ping_stats_count_full_unscheduled_ping_drop": MetricInfo(kind="counter"),
     "usage_download_usage": MetricInfo(unit="bytes", kind="counter"),
     "usage_upload_usage": MetricInfo(unit="bytes", kind="counter"),
     "power_latest_power": MetricInfo(),
@@ -160,7 +168,8 @@ def parse_args():
     group.add_argument("--address", default="0.0.0.0", help="IP address to listen on")
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
-    return dish_common.run_arg_parser(parser, modes=["status", "alert_detail", "usage", "location", "power"])
+    return dish_common.run_arg_parser(
+        parser, modes=["status", "alert_detail", "usage", "location", "power", "ping_drop"])
 
 
 def prometheus_export(opts, gstate):
@@ -177,6 +186,10 @@ def prometheus_export(opts, gstate):
         rc, status_ts, hist_ts = dish_common.get_data(opts, gstate, data_add_item,
                                                       data_add_sequencem)
 
+    # use the timestamp from whichever data group was actually collected, so
+    # that a history stats mode (e.g. ping_drop) can be exported on its own
+    timestamp = status_ts if status_ts is not None else hist_ts
+
     metrics = []
 
     # snr is not supported by starlink any more but still returned by the grpc
@@ -184,18 +197,19 @@ def prometheus_export(opts, gstate):
     if "status_snr" in raw_data:
         del raw_data["status_snr"]
 
-    metrics.append(
-        Metric(
-            name="starlink_status_state",
-            timestamp=status_ts,
-            values=[
-                MetricValue(
-                    value=int(raw_data["status_state"] == state_value),
-                    labels={"state": state_value},
-                ) for state_value in STATE_VALUES
-            ],
-        ))
-    del raw_data["status_state"]
+    if "status_state" in raw_data:
+        metrics.append(
+            Metric(
+                name="starlink_status_state",
+                timestamp=timestamp,
+                values=[
+                    MetricValue(
+                        value=int(raw_data["status_state"] == state_value),
+                        labels={"state": state_value},
+                    ) for state_value in STATE_VALUES
+                ],
+            ))
+        del raw_data["status_state"]
 
     info_metrics = ["status_id", "status_hardware_version", "status_software_version"]
     metrics_not_found = []
@@ -205,7 +219,7 @@ def prometheus_export(opts, gstate):
         metrics.append(
             Metric(
                 name="starlink_info",
-                timestamp=status_ts,
+                timestamp=timestamp,
                 values=[
                     MetricValue(
                         value=1,
@@ -222,7 +236,7 @@ def prometheus_export(opts, gstate):
             metrics.append(
                 Metric(
                     name=f"starlink_{name}{metric_info.unit}",
-                    timestamp=status_ts,
+                    timestamp=timestamp,
                     kind=metric_info.kind,
                     values=[MetricValue(value=float(raw_data.pop(name) or 0))],
                 ))
@@ -232,14 +246,14 @@ def prometheus_export(opts, gstate):
     metrics.append(
         Metric(
             name="starlink_exporter_unprocessed_metrics",
-            timestamp=status_ts,
+            timestamp=timestamp,
             values=[MetricValue(value=1, labels={"metric": name}) for name in raw_data],
         ))
 
     metrics.append(
         Metric(
             name="starlink_exporter_missing_metrics",
-            timestamp=status_ts,
+            timestamp=timestamp,
             values=[MetricValue(
                 value=1,
                 labels={"metric": name},
