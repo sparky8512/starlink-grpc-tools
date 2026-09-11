@@ -1,0 +1,47 @@
+# --- Python cache directories ---
+__pycache__/
+*/__pycache__/
+**/__pycache__/
+
+# Compiled Python files
+*.pyc
+*.pyo
+*.pyd
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Build artifacts ---
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Logs ---
+*.log
+logs/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-build/
+docker-cache/
+
+# --- Environment files ---
+*.env
+**/*.env
+**/secrets.env
+
+# --- Project-specific ---
+output/
+results/
+exports/
+data/
