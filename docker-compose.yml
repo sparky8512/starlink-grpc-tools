@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  starlink-nav:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: starlink-nav
+    command: ["python3", "main.py", "-g", "192.168.4.53:9200"]
+    restart: unless-stopped
+    working_dir: /app
+    volumes:
+      - ./data:/app/data
+    networks:
+      - starlink-net
+
+networks:
+  starlink-net:
+    external: true

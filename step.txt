@@ -1,0 +1,9 @@
+docker compose build --no-cache
+
+
+docker save starlink-grpc-tools-starlink-nav:latest -o starlink-nav.tar
+
+
+copy starlink-nav.tar \\Fishtank\d\
+
+scp starlink-nav.tar user@boat-computer:/home/user/
