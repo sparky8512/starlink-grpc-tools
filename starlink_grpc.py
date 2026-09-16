@@ -58,6 +58,14 @@ This group holds information about the current state of the user terminal.
     indicates the alert is active. See alert detail status data for which bits
     correspond with each alert, or to get individual alert flags instead of a
     combined bit mask.
+: **software_update_state** : Numeric enum value describing the current
+    software update state, or None if not reported by the user terminal.
+: **software_update_progress** : Software update progress from 0 to 1, or None
+    if not reported by the user terminal.
+: **swupdate_reboot_ready** : Boolean indicating whether or not the terminal
+    reports that it is ready to reboot for a software update.
+: **seconds_until_swupdate_reboot_possible** : Seconds until a software update
+    reboot is possible, or None if not reported by the user terminal.
 : **fraction_obstructed** : The fraction of total area (or possibly fraction
     of time?) that the user terminal has determined to be obstructed between
     it and the satellites with which it communicates.
