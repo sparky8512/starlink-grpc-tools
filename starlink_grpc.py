@@ -33,6 +33,10 @@ This group holds information about the current state of the user terminal.
     version.
 : **software_version** : A string identifying the software currently installed
     on the user terminal.
+: **software_update_state** : A string describing the state of software update,
+    or None if not reported by the user terminal. One of:
+    "SOFTWARE_UPDATE_STATE_UNKNOWN", "IDLE", "FETCHING", "PRE_CHECK",
+    "WRITING", "POST_CHECK", "REBOOT_REQUIRED", "DISABLED", and "FAULTED".
 : **state** : As string describing the current connectivity state of the user
     terminal. One of: "UNKNOWN", "CONNECTED", "BOOTING", "SEARCHING", "STOWED",
     "THERMAL_SHUTDOWN", "NO_SATS", "OBSTRUCTED", "NO_DOWNLINK", "NO_PINGS".
@@ -58,14 +62,6 @@ This group holds information about the current state of the user terminal.
     indicates the alert is active. See alert detail status data for which bits
     correspond with each alert, or to get individual alert flags instead of a
     combined bit mask.
-: **software_update_state** : Numeric enum value describing the current
-    software update state, or None if not reported by the user terminal.
-: **software_update_progress** : Software update progress from 0 to 1, or None
-    if not reported by the user terminal.
-: **swupdate_reboot_ready** : Boolean indicating whether or not the terminal
-    reports that it is ready to reboot for a software update.
-: **seconds_until_swupdate_reboot_possible** : Seconds until a software update
-    reboot is possible, or None if not reported by the user terminal.
 : **fraction_obstructed** : The fraction of total area (or possibly fraction
     of time?) that the user terminal has determined to be obstructed between
     it and the satellites with which it communicates.
@@ -97,6 +93,18 @@ This group holds information about the current state of the user terminal.
 : **gps_enabled** : Boolean indicating whether or not the user terminal will
     use GPS for position data if and when it becomes ready.
 : **gps_sats** : Number of satellites actively being used.
+
+Software update detail status data
+----------------------------------
+This group holds additional detail regarding software updates reported by the
+user terminal.
+
+: **software_update_progress** : Software update progress from 0 to 1, or None
+    if not reported by the user terminal.
+: **software_update_reboot_ready** : Boolean indicating whether or not the
+    terminal reports that it is ready to reboot for a software update.
+: **seconds_until_software_update_reboot_possible** : Seconds until a software
+    update reboot is possible, or None if not reported by the user terminal.
 
 Obstruction detail status data
 ------------------------------
@@ -443,36 +451,44 @@ HISTORY_FIELDS = ("pop_ping_drop_rate", "pop_ping_latency_ms", "downlink_through
 
 StatusDict = TypedDict(
     "StatusDict", {
-        "id": str,
-        "hardware_version": str,
-        "software_version": str,
+        "id": Optional[str],
+        "hardware_version": Optional[str],
+        "software_version": Optional[str],
         "state": str,
-        "uptime": int,
+        "uptime": Optional[int],
         "snr": Optional[float],
-        "seconds_to_first_nonempty_slot": float,
-        "pop_ping_drop_rate": float,
-        "downlink_throughput_bps": float,
-        "uplink_throughput_bps": float,
-        "pop_ping_latency_ms": float,
+        "seconds_to_first_nonempty_slot": Optional[float],
+        "pop_ping_drop_rate": Optional[float],
+        "downlink_throughput_bps": Optional[float],
+        "uplink_throughput_bps": Optional[float],
+        "pop_ping_latency_ms": Optional[float],
         "alerts": int,
-        "fraction_obstructed": float,
-        "currently_obstructed": bool,
+        "software_update_state": Optional[str],
+        "fraction_obstructed": Optional[float],
+        "currently_obstructed": Optional[bool],
         "seconds_obstructed": Optional[float],
         "obstruction_duration": Optional[float],
         "obstruction_interval": Optional[float],
-        "direction_azimuth": float,
-        "direction_elevation": float,
-        "is_snr_above_noise_floor": bool,
-        "gps_ready": bool,
-        "gps_enabled": bool,
-        "gps_sats": int,
+        "direction_azimuth": Optional[float],
+        "direction_elevation": Optional[float],
+        "is_snr_above_noise_floor": Optional[bool],
+        "gps_ready": Optional[bool],
+        "gps_enabled": Optional[bool],
+        "gps_sats": Optional[int],
+    })
+
+SoftwareUpdateDict = TypedDict(
+    "SoftwareUpdateDict", {
+        "software_update_progress": Optional[float],
+        "software_update_reboot_ready": Optional[bool],
+        "seconds_until_software_update_reboot_possible": Optional[int],
     })
 
 ObstructionDict = TypedDict(
     "ObstructionDict", {
         "wedges_fraction_obstructed[]": Sequence[Optional[float]],
         "raw_wedges_fraction_obstructed[]": Sequence[Optional[float]],
-        "valid_s": float,
+        "valid_s": Optional[float],
     })
 
 AlertDict = Dict[str, bool]
@@ -585,6 +601,19 @@ def _field_types(hint_type):
         return value
 
     return list(xlate(val) for val in get_type_hints(hint_type).values())
+
+
+def _enum_name(message, field_name: str) -> Optional[str]:
+    value = None
+    try:
+        value = getattr(message, field_name)
+        field = message.DESCRIPTOR.fields_by_name[field_name]
+        enum_value = field.enum_type.values_by_number.get(value)
+        return enum_value.name if enum_value is not None else str(value)
+    except AttributeError:
+        return None
+    except (KeyError, TypeError, ValueError):
+        return None if value is None else str(value)
 
 
 def resolve_imports(channel: grpc.Channel):
@@ -705,8 +734,9 @@ def status_field_names(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 3 lists, with status data field names, obstruction detail
-        field names, and alert detail field names, in that order.
+        A tuple with 4 lists, with status data field names, software update
+        detail field names, obstruction detail field names, and alert detail
+        field names, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -724,7 +754,8 @@ def status_field_names(context: Optional[ChannelContext] = None):
     except AttributeError:
         pass
 
-    return _field_names(StatusDict), _field_names(ObstructionDict), alert_names
+    return (_field_names(StatusDict), _field_names(SoftwareUpdateDict),
+            _field_names(ObstructionDict), alert_names)
 
 
 def status_field_types(context: Optional[ChannelContext] = None):
@@ -738,8 +769,9 @@ def status_field_types(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 3 lists, with status data field types, obstruction detail
-        field types, and alert detail field types, in that order.
+        A tuple with 4 lists, with status data field types, software update
+        detail field types, obstruction detail field types, and alert detail
+        field types, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -755,7 +787,8 @@ def status_field_types(context: Optional[ChannelContext] = None):
         num_alerts = len(DishAlerts.DESCRIPTOR.fields)
     except AttributeError:
         pass
-    return (_field_types(StatusDict), _field_types(ObstructionDict), [bool] * num_alerts)
+    return (_field_types(StatusDict), _field_types(SoftwareUpdateDict),
+            _field_types(ObstructionDict), [bool] * num_alerts)
 
 
 def get_status(context: Optional[ChannelContext] = None):
@@ -806,7 +839,8 @@ def get_id(context: Optional[ChannelContext] = None) -> str:
 
 
 def status_data(
-        context: Optional[ChannelContext] = None) -> Tuple[StatusDict, ObstructionDict, AlertDict]:
+        context: Optional[ChannelContext] = None
+) -> Tuple[StatusDict, SoftwareUpdateDict, ObstructionDict, AlertDict]:
     """Fetch current status data.
 
     Args:
@@ -814,9 +848,9 @@ def status_data(
             across repeated calls.
 
     Returns:
-        A tuple with 3 dicts, mapping status data field names, obstruction
-        detail field names, and alert detail field names to their respective
-        values, in that order.
+        A tuple with 4 dicts, mapping status data field names, software update
+        detail field names, obstruction detail field names, and alert detail
+        field names to their respective values, in that order.
 
     Raises:
         GrpcError: Failed getting status info from the Starlink user terminal.
@@ -846,7 +880,7 @@ def status_data(
     # More alerts may be added in future, so in addition to listing them
     # individually, provide a bit field based on field numbers of the
     # DishAlerts message.
-    alerts = {}
+    alerts: AlertDict = {}
     alert_bits = 0
     try:
         for field in status.alerts.DESCRIPTOR.fields:
@@ -872,7 +906,15 @@ def status_data(
     device_info = getattr(status, "device_info", None)
     gps_stats = getattr(status, "gps_stats", None)
     inhibit_gps = getattr(gps_stats, "inhibit_gps", None)
-    return {
+    software_update_stats = getattr(status, "software_update_stats", None)
+    software_update_progress = None
+    try:
+        if status.HasField("software_update_stats"):
+            software_update_progress = getattr(software_update_stats, "software_update_progress", None)
+    except (AttributeError, ValueError):
+        pass
+
+    status_data_dict: StatusDict = {
         "id": getattr(device_info, "id", None),
         "hardware_version": getattr(device_info, "hardware_version", None),
         "software_version": getattr(device_info, "software_version", None),
@@ -885,6 +927,7 @@ def status_data(
         "uplink_throughput_bps": getattr(status, "uplink_throughput_bps", None),
         "pop_ping_latency_ms": getattr(status, "pop_ping_latency_ms", None),
         "alerts": alert_bits,
+        "software_update_state": _enum_name(status, "software_update_state"),
         "fraction_obstructed": getattr(obstruction_stats, "fraction_obstructed", None),
         "currently_obstructed": getattr(obstruction_stats, "currently_obstructed", None),
         "seconds_obstructed": None,  # obsoleted in grpc service
@@ -896,11 +939,19 @@ def status_data(
         "gps_ready": getattr(gps_stats, "gps_valid", None),
         "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
         "gps_sats": getattr(gps_stats, "gps_sats", None),
-    }, {
+    }
+    software_update_detail: SoftwareUpdateDict = {
+        "software_update_progress": software_update_progress,
+        "software_update_reboot_ready": getattr(status, "swupdate_reboot_ready", None),
+        "seconds_until_software_update_reboot_possible": getattr(
+            status, "seconds_until_swupdate_reboot_possible", None),
+    }
+    obstruction_detail: ObstructionDict = {
         "wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "valid_s": getattr(obstruction_stats, "valid_s", None),
-    }, alerts
+    }
+    return status_data_dict, software_update_detail, obstruction_detail, alerts
 
 
 def location_field_names():

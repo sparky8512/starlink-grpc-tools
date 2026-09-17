@@ -137,10 +137,12 @@ def print_header(opts, print_file):
                 return 1
             if "status" in opts.mode:
                 header_add(name_groups[0])
-            if "obstruction_detail" in opts.mode:
+            if "software_update_detail" in opts.mode:
                 header_add(name_groups[1])
-            if "alert_detail" in opts.mode:
+            if "obstruction_detail" in opts.mode:
                 header_add(name_groups[2])
+            if "alert_detail" in opts.mode:
+                header_add(name_groups[3])
         if "location" in opts.mode:
             header_add(starlink_grpc.location_field_names())
 
