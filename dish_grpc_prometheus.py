@@ -115,6 +115,8 @@ STATE_VALUES = [
     "DISH_UNREACHABLE",
 ]
 
+# Software update states are derived from protocol data at runtime and may
+# change with user terminal firmware.
 SOFTWARE_UPDATE_STATE_VALUES = [
     "SOFTWARE_UPDATE_STATE_UNKNOWN",
     "IDLE",

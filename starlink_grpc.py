@@ -463,7 +463,6 @@ StatusDict = TypedDict(
         "uplink_throughput_bps": Optional[float],
         "pop_ping_latency_ms": Optional[float],
         "alerts": int,
-        "software_update_state": Optional[str],
         "fraction_obstructed": Optional[float],
         "currently_obstructed": Optional[bool],
         "seconds_obstructed": Optional[float],
@@ -475,6 +474,7 @@ StatusDict = TypedDict(
         "gps_ready": Optional[bool],
         "gps_enabled": Optional[bool],
         "gps_sats": Optional[int],
+        "software_update_state": Optional[str],
     })
 
 SoftwareUpdateDict = TypedDict(
@@ -734,9 +734,9 @@ def status_field_names(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 4 lists, with status data field names, software update
-        detail field names, obstruction detail field names, and alert detail
-        field names, in that order.
+        A tuple with 4 lists, with status data field names, obstruction detail
+        field names, alert detail field names, and software update detail field
+        names, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -754,8 +754,8 @@ def status_field_names(context: Optional[ChannelContext] = None):
     except AttributeError:
         pass
 
-    return (_field_names(StatusDict), _field_names(SoftwareUpdateDict),
-            _field_names(ObstructionDict), alert_names)
+    return (_field_names(StatusDict), _field_names(ObstructionDict),
+            alert_names, _field_names(SoftwareUpdateDict))
 
 
 def status_field_types(context: Optional[ChannelContext] = None):
@@ -769,9 +769,9 @@ def status_field_types(context: Optional[ChannelContext] = None):
             with reflection service.
 
     Returns:
-        A tuple with 4 lists, with status data field types, software update
-        detail field types, obstruction detail field types, and alert detail
-        field types, in that order.
+        A tuple with 4 lists, with status data field types, obstruction detail
+        field types, alert detail field types, and software update detail field
+        types, in that order.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -787,8 +787,8 @@ def status_field_types(context: Optional[ChannelContext] = None):
         num_alerts = len(DishAlerts.DESCRIPTOR.fields)
     except AttributeError:
         pass
-    return (_field_types(StatusDict), _field_types(SoftwareUpdateDict),
-            _field_types(ObstructionDict), [bool] * num_alerts)
+    return (_field_types(StatusDict), _field_types(ObstructionDict),
+            [bool] * num_alerts, _field_types(SoftwareUpdateDict))
 
 
 def get_status(context: Optional[ChannelContext] = None):
@@ -840,7 +840,7 @@ def get_id(context: Optional[ChannelContext] = None) -> str:
 
 def status_data(
         context: Optional[ChannelContext] = None
-) -> Tuple[StatusDict, SoftwareUpdateDict, ObstructionDict, AlertDict]:
+) -> Tuple[StatusDict, ObstructionDict, AlertDict, SoftwareUpdateDict]:
     """Fetch current status data.
 
     Args:
@@ -848,8 +848,8 @@ def status_data(
             across repeated calls.
 
     Returns:
-        A tuple with 4 dicts, mapping status data field names, software update
-        detail field names, obstruction detail field names, and alert detail
+        A tuple with 4 dicts, mapping status data field names, obstruction
+        detail field names, alert detail field names, and software update detail
         field names to their respective values, in that order.
 
     Raises:
@@ -927,7 +927,6 @@ def status_data(
         "uplink_throughput_bps": getattr(status, "uplink_throughput_bps", None),
         "pop_ping_latency_ms": getattr(status, "pop_ping_latency_ms", None),
         "alerts": alert_bits,
-        "software_update_state": _enum_name(status, "software_update_state"),
         "fraction_obstructed": getattr(obstruction_stats, "fraction_obstructed", None),
         "currently_obstructed": getattr(obstruction_stats, "currently_obstructed", None),
         "seconds_obstructed": None,  # obsoleted in grpc service
@@ -939,6 +938,7 @@ def status_data(
         "gps_ready": getattr(gps_stats, "gps_valid", None),
         "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
         "gps_sats": getattr(gps_stats, "gps_sats", None),
+        "software_update_state": _enum_name(status, "software_update_state"),
     }
     software_update_detail: SoftwareUpdateDict = {
         "software_update_progress": software_update_progress,
@@ -951,7 +951,7 @@ def status_data(
         "raw_wedges_fraction_obstructed[]": [None] * 12,  # obsoleted in grpc service
         "valid_s": getattr(obstruction_stats, "valid_s", None),
     }
-    return status_data_dict, software_update_detail, obstruction_detail, alerts
+    return status_data_dict, obstruction_detail, alerts, software_update_detail
 
 
 def location_field_names():
