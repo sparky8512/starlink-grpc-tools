@@ -53,6 +53,9 @@ METRICS_INFO = {
     "status_uplink_throughput_bps": MetricInfo(),
     "status_pop_ping_latency_ms": MetricInfo(),
     "status_alerts": MetricInfo(),
+    "status_software_update_progress": MetricInfo(),
+    "status_software_update_reboot_ready": MetricInfo(),
+    "status_seconds_until_software_update_reboot_possible": MetricInfo(),
     "status_fraction_obstructed": MetricInfo(),
     "status_currently_obstructed": MetricInfo(),
     "status_seconds_obstructed": MetricInfo(),
@@ -112,6 +115,20 @@ STATE_VALUES = [
     "DISH_UNREACHABLE",
 ]
 
+# Software update states are derived from protocol data at runtime and may
+# change with user terminal firmware.
+SOFTWARE_UPDATE_STATE_VALUES = [
+    "SOFTWARE_UPDATE_STATE_UNKNOWN",
+    "IDLE",
+    "FETCHING",
+    "PRE_CHECK",
+    "WRITING",
+    "POST_CHECK",
+    "REBOOT_REQUIRED",
+    "DISABLED",
+    "FAULTED",
+]
+
 
 class Metric:
     name = ""
@@ -169,7 +186,11 @@ def parse_args():
     group.add_argument("--port", default=8080, type=int, help="Port to listen on")
 
     return dish_common.run_arg_parser(
-        parser, modes=["status", "alert_detail", "usage", "location", "power", "ping_drop"])
+        parser,
+        modes=[
+            "status", "software_update_detail", "alert_detail", "usage", "location", "power",
+            "ping_drop"
+        ])
 
 
 def prometheus_export(opts, gstate):
@@ -210,6 +231,20 @@ def prometheus_export(opts, gstate):
                 ],
             ))
         del raw_data["status_state"]
+
+    if "status_software_update_state" in raw_data:
+        metrics.append(
+            Metric(
+                name="starlink_status_software_update_state",
+                timestamp=timestamp,
+                values=[
+                    MetricValue(
+                        value=int(raw_data["status_software_update_state"] == state_value),
+                        labels={"state": state_value},
+                    ) for state_value in SOFTWARE_UPDATE_STATE_VALUES
+                ],
+            ))
+        del raw_data["status_software_update_state"]
 
     info_metrics = ["status_id", "status_hardware_version", "status_software_version"]
     metrics_not_found = []

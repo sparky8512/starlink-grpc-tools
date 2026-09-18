@@ -26,7 +26,7 @@ def run_loop(context):
     prev_triggered = False
     while True:
         try:
-            # `starlink_grpc.status_data` returns a tuple of 3 dicts, but in case
+            # `starlink_grpc.status_data` returns a tuple of 4 dicts, but in case
             # the API changes to add more in the future, it's best to reference
             # them by index instead of direct assignment from the function call.
             groups = starlink_grpc.status_data(context=context)

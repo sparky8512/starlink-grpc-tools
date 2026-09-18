@@ -24,7 +24,9 @@ import starlink_grpc
 
 BRACKETS_RE = re.compile(r"([^[]*)(\[((\d+),|)(\d*)\]|)$")
 LOOP_TIME_DEFAULT = 0
-STATUS_MODES: List[str] = ["status", "obstruction_detail", "alert_detail", "location"]
+STATUS_MODES: List[str] = [
+    "status", "obstruction_detail", "alert_detail", "location", "software_update_detail"
+]
 HISTORY_STATS_MODES: List[str] = [
     "ping_drop", "ping_run_length", "ping_latency", "ping_loaded_latency", "usage", "power"
 ]
@@ -265,7 +267,7 @@ def get_status_data(opts, gstate, add_item, add_sequence):
         if opts.pure_status_mode or opts.need_id and gstate.dish_id is None:
             try:
                 groups = starlink_grpc.status_data(context=gstate.context)
-                status_data, obstruct_detail, alert_detail = groups[0:3]
+                status_data, obstruct_detail, alert_detail, software_update_detail = groups[0:4]
             except starlink_grpc.GrpcError as e:
                 if "status" in opts.mode:
                     if opts.need_id and gstate.dish_id is None:
@@ -286,6 +288,8 @@ def get_status_data(opts, gstate, add_item, add_sequence):
                 add_data(obstruct_detail, "status", add_item, add_sequence)
             if "alert_detail" in opts.mode:
                 add_data(alert_detail, "status", add_item, add_sequence)
+            if "software_update_detail" in opts.mode:
+                add_data(software_update_detail, "status", add_item, add_sequence)
         if "location" in opts.mode:
             try:
                 location = starlink_grpc.location_data(context=gstate.context)
