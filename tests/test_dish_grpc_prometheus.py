@@ -75,6 +75,96 @@ class TestDishGrpcPrometheus(unittest.TestCase):
         # Inactive mode metrics still should not be reported
         self.assertNotIn('metric="ping_stats_samples"', output)
 
+    def test_status_mode_does_not_report_other_status_groups_as_missing(self):
+        self.opts.mode = ["status"]
+
+        def fake_get_data(opts, gstate, add_item, add_sequence):
+            add_item("uptime", 500, "status")
+            return 0, 1000, None
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+            output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        # software_update_detail, location and alert_detail are separate groups
+        self.assertNotIn('metric="status_software_update_progress"', output)
+        self.assertNotIn('metric="status_software_update_reboot_ready"', output)
+        self.assertNotIn(
+            'metric="status_seconds_until_software_update_reboot_possible"', output)
+        self.assertNotIn('metric="status_latitude"', output)
+        self.assertNotIn('metric="status_alert_motors_stuck"', output)
+
+    def test_software_update_detail_mode_reports_only_its_own_metrics(self):
+        self.opts.mode = ["software_update_detail"]
+
+        def fake_get_data(opts, gstate, add_item, add_sequence):
+            add_item("software_update_progress", 0.5, "status")
+            add_item("software_update_reboot_ready", False, "status")
+            return 0, 1000, None
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+            output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        self.assertIn("starlink_status_software_update_progress 0.5 1000000", output)
+        self.assertIn("starlink_status_software_update_reboot_ready 0.0 1000000", output)
+
+        # A field the dish did not report is still flagged
+        self.assertIn(
+            'metric="status_seconds_until_software_update_reboot_possible"', output)
+
+        # Nothing from the main status group is collected in this mode
+        self.assertNotIn('metric="status_uptime"', output)
+        self.assertNotIn('metric="status_id"', output)
+        self.assertNotIn("starlink_info", output)
+
+    def test_software_update_detail_metrics_missing_when_combined_with_status(self):
+        self.opts.mode = ["status", "software_update_detail"]
+
+        def fake_get_data(opts, gstate, add_item, add_sequence):
+            add_item("uptime", 500, "status")
+            return 0, 1000, None
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+            output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        self.assertIn('metric="status_software_update_progress"', output)
+        self.assertIn('metric="status_software_update_reboot_ready"', output)
+
+    def test_info_metric_only_emitted_when_info_fields_present(self):
+        self.opts.mode = ["ping_drop"]
+
+        def fake_get_data(opts, gstate, add_item, add_sequence):
+            add_item("samples", 100, "ping_stats")
+            return 0, None, 2000
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+            output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        self.assertNotIn("starlink_info", output)
+
+        self.opts.mode = ["status"]
+
+        def fake_get_data_with_info(opts, gstate, add_item, add_sequence):
+            add_item("id", "ut01", "status")
+            add_item("hardware_version", "rev4", "status")
+            add_item("software_version", "abc", "status")
+            return 0, 1000, None
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data_with_info):
+            output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        self.assertIn('starlink_info{id="ut01",hardware_version="rev4",software_version="abc"}',
+                      output)
+
+    def test_every_metric_belongs_to_a_mode(self):
+        all_modes = [
+            "status", "software_update_detail", "alert_detail", "usage", "location", "power",
+            "ping_drop"
+        ]
+        for name in dish_grpc_prometheus.METRICS_INFO:
+            self.assertTrue(dish_grpc_prometheus.is_metric_expected(name, all_modes), name)
+            # A metric with no owning mode would be expected regardless of the selection
+            self.assertFalse(dish_grpc_prometheus.is_metric_expected(name, []), name)
+
     def test_metrics_request_handler_content_length_and_charset(self):
         class DummyServer:
             def __init__(self):

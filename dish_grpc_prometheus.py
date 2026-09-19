@@ -193,14 +193,31 @@ def parse_args():
         ])
 
 
+# Metrics that are only collected when a specific status data group is selected.
+# Any other "status_" metric comes from the "status" mode itself.
+LOCATION_METRICS = frozenset(["status_latitude", "status_longitude", "status_altitude"])
+SOFTWARE_UPDATE_DETAIL_METRICS = frozenset([
+    "status_software_update_progress",
+    "status_software_update_reboot_ready",
+    "status_seconds_until_software_update_reboot_possible",
+])
+
+
 def is_metric_expected(name, modes):
+    """Whether the selected modes are expected to produce the given metric."""
+    if name in LOCATION_METRICS:
+        return "location" in modes
+    if name in SOFTWARE_UPDATE_DETAIL_METRICS:
+        return "software_update_detail" in modes
+    if name.startswith("status_alert_"):
+        return "alert_detail" in modes
     if name.startswith("status_"):
-        return any(m in modes for m in ("status", "alert_detail", "location"))
-    elif name.startswith("ping_stats_"):
+        return "status" in modes
+    if name.startswith("ping_stats_"):
         return "ping_drop" in modes
-    elif name.startswith("usage_"):
+    if name.startswith("usage_"):
         return "usage" in modes
-    elif name.startswith("power_"):
+    if name.startswith("power_"):
         return "power" in modes
     return True
 
@@ -260,10 +277,10 @@ def prometheus_export(opts, gstate):
 
     info_metrics = ["status_id", "status_hardware_version", "status_software_version"]
     metrics_not_found = []
-    if any(m in opts.mode for m in ("status", "alert_detail", "location")):
+    if "status" in opts.mode:
         metrics_not_found.extend([x for x in info_metrics if x not in raw_data])
 
-    if len(metrics_not_found) < len(info_metrics):
+    if any(x in raw_data for x in info_metrics):
         metrics.append(
             Metric(
                 name="starlink_info",
