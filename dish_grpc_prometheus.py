@@ -193,6 +193,35 @@ def parse_args():
         ])
 
 
+# Metrics that are only collected when a specific status data group is selected.
+# Any other "status_" metric comes from the "status" mode itself.
+LOCATION_METRICS = frozenset(["status_latitude", "status_longitude", "status_altitude"])
+SOFTWARE_UPDATE_DETAIL_METRICS = frozenset([
+    "status_software_update_progress",
+    "status_software_update_reboot_ready",
+    "status_seconds_until_software_update_reboot_possible",
+])
+
+
+def is_metric_expected(name, modes):
+    """Whether the selected modes are expected to produce the given metric."""
+    if name in LOCATION_METRICS:
+        return "location" in modes
+    if name in SOFTWARE_UPDATE_DETAIL_METRICS:
+        return "software_update_detail" in modes
+    if name.startswith("status_alert_"):
+        return "alert_detail" in modes
+    if name.startswith("status_"):
+        return "status" in modes
+    if name.startswith("ping_stats_"):
+        return "ping_drop" in modes
+    if name.startswith("usage_"):
+        return "usage" in modes
+    if name.startswith("power_"):
+        return "power" in modes
+    return True
+
+
 def prometheus_export(opts, gstate):
     raw_data = {}
 
@@ -200,12 +229,12 @@ def prometheus_export(opts, gstate):
         raw_data[category + "_" + name] = value
         pass
 
-    def data_add_sequencem(name, value, category, start):
+    def data_add_sequence(name, value, category, start):
         raise NotImplementedError("Did not expect sequence data")
 
     with gstate.lock:
         rc, status_ts, hist_ts = dish_common.get_data(opts, gstate, data_add_item,
-                                                      data_add_sequencem)
+                                                      data_add_sequence)
 
     # use the timestamp from whichever data group was actually collected, so
     # that a history stats mode (e.g. ping_drop) can be exported on its own
@@ -248,9 +277,10 @@ def prometheus_export(opts, gstate):
 
     info_metrics = ["status_id", "status_hardware_version", "status_software_version"]
     metrics_not_found = []
-    metrics_not_found.extend([x for x in info_metrics if x not in raw_data])
+    if "status" in opts.mode:
+        metrics_not_found.extend([x for x in info_metrics if x not in raw_data])
 
-    if len(metrics_not_found) < len(info_metrics):
+    if any(x in raw_data for x in info_metrics):
         metrics.append(
             Metric(
                 name="starlink_info",
@@ -275,7 +305,7 @@ def prometheus_export(opts, gstate):
                     kind=metric_info.kind,
                     values=[MetricValue(value=float(raw_data.pop(name) or 0))],
                 ))
-        else:
+        elif is_metric_expected(name, opts.mode):
             metrics_not_found.append(name)
 
     metrics.append(
@@ -309,11 +339,12 @@ class MetricsRequestHandler(BaseHTTPRequestHandler):
         gstate = self.server.gstate
 
         content = prometheus_export(opts, gstate)
+        body = content.encode("utf-8")
         self.send_response(HTTPStatus.OK)
-        self.send_header("Content-type", "text/plain")
-        self.send_header("Content-Length", len(content))
+        self.send_header("Content-type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(content.encode())
+        self.wfile.write(body)
 
 
 def main():
