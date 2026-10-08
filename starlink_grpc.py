@@ -139,9 +139,15 @@ sum of all *wedges_fraction_obstructed* elements.
 Alert detail status data
 ------------------------
 This group holds the current state of each individual alert reported by the
-user terminal. Note that more alerts may be added in the future. See also
-*alerts* in the general status data for a bit field combining them if you
-need a set of fields that will not change size in the future.
+user terminal. Note that more alerts may be added in the future and existing
+alerts may stop being reported if they become obsoleted by the user terminal
+firmware.
+
+See also *alerts* in the general status data for a bit field combining them if
+you need a set of fields that will not change size in the future. The bit masks
+noted below should remain valid even if alerts are added or removed, but this
+is contingent on the user terminal firmware not doing something broken to the
+service protocol.
 
 Descriptions on these are vague due to them being difficult to confirm by
 their nature, but the field names are pretty self-explanatory.
@@ -159,6 +165,7 @@ their nature, but the field names are pretty self-explanatory.
 : **alert_slow_ethernet_speeds** : Alert corresponding with bit 5 (bit mask
     32) in *alerts*.
 : **alert_roaming** : Alert corresponding with bit 6 (bit mask 64) in *alerts*.
+    **OBSOLETE**: This alert is no longer generated.
 : **alert_install_pending** : Alert corresponding with bit 7 (bit mask 128) in
     *alerts*.
 : **alert_is_heating** : Alert corresponding with bit 8 (bit mask 256) in
@@ -192,6 +199,8 @@ their nature, but the field names are pretty self-explanatory.
     1048576) in *alerts*.
 : **alert_upsu_router_port_slow** : Alert corresponding with bit 21 (bit mask
     2097152) in *alerts*.
+: **alert_no_ethernet_link** : Alert corresponding with bit 22 (bit mask
+    4194304) in *alerts*.
 
 Location data
 -------------
@@ -1829,7 +1838,11 @@ def set_sleep_config(start: int,
 
 
 def set_gps_config(enable: bool, context: Optional[ChannelContext] = None) -> bool:
-    """Set sleep mode configuration.
+    """Set GPS usage configuration.
+
+    Note:
+        This configuration resets to GPS enabled on reboot of the user
+        terminal.
 
     Args:
         enable (bool): Whether or not to use GPS for position data.
