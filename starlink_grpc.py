@@ -34,12 +34,15 @@ This group holds information about the current state of the user terminal.
 : **software_version** : A string identifying the software currently installed
     on the user terminal.
 : **software_update_state** : A string describing the state of software update,
-    or None if not reported by the user terminal. One of:
+    or None if not reported by the user terminal. Currently, one of:
     "SOFTWARE_UPDATE_STATE_UNKNOWN", "IDLE", "FETCHING", "PRE_CHECK",
     "WRITING", "POST_CHECK", "REBOOT_REQUIRED", "DISABLED", and "FAULTED".
 : **state** : As string describing the current connectivity state of the user
-    terminal. One of: "UNKNOWN", "CONNECTED", "BOOTING", "SEARCHING", "STOWED",
-    "THERMAL_SHUTDOWN", "NO_SATS", "OBSTRUCTED", "NO_DOWNLINK", "NO_PINGS".
+    terminal. Currently, one of: "UNKNOWN", "CONNECTED", "BOOTING",
+    "SEARCHING", "STOWED", "THERMAL_SHUTDOWN", "NO_SATS", "OBSTRUCTED",
+    "NO_DOWNLINK", "NO_PINGS", "ACTUATOR_ACTIVITY", "CABLE_TEST", "SLEEPING",
+    "SKY_SEARCH", and "INHIBIT_RF". Other than "CONNECTED", which indicates
+    non-outage, this list is subject to change.
 : **uptime** : The amount of time, in seconds, since the user terminal last
     rebooted.
 : **snr** : Most recent sample value. See bulk history data for detail.
@@ -747,6 +750,11 @@ def status_field_names(context: Optional[ChannelContext] = None):
         field names, alert detail field names, and software update detail field
         names, in that order.
 
+        Note:
+            Additional lists may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 4 elements.
+
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
             via reflection.
@@ -781,6 +789,11 @@ def status_field_types(context: Optional[ChannelContext] = None):
         A tuple with 4 lists, with status data field types, obstruction detail
         field types, alert detail field types, and software update detail field
         types, in that order.
+
+        Note:
+            Additional lists may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 4 elements.
 
     Raises:
         GrpcError: No user terminal is currently available to resolve imports
@@ -860,6 +873,11 @@ def status_data(
         A tuple with 4 dicts, mapping status data field names, obstruction
         detail field names, alert detail field names, and software update detail
         field names to their respective values, in that order.
+
+        Note:
+            Additional dicts may be added to this tuple in the future with
+            additional data groups, so it not recommended for the caller to
+            assume exactly 4 elements.
 
     Raises:
         GrpcError: Failed getting status info from the Starlink user terminal.
