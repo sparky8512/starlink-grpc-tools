@@ -204,6 +204,7 @@ def main():
 
     context = starlink_grpc.ChannelContext(target=opts.target)
 
+    rc = 0
     try:
         if opts.reset:
             starlink_grpc.reset_obstruction_map(context)
