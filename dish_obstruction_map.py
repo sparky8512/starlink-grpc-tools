@@ -86,6 +86,9 @@ def loop_body(opts, context):
                 if not opts.no_alpha:
                     yield opts.no_data_color_a
 
+    if not snr_data or not snr_data[0]:
+        logging.error("Invalid SNR map data: Zero-length")
+        return 1
     if opts.filename == "-":
         # Open new stdout file to get binary mode
         out_file = os.fdopen(sys.stdout.fileno(), "wb", closefd=False)
@@ -97,9 +100,6 @@ def loop_body(opts, context):
             datetime.fromtimestamp(now, timezone.utc).strftime("%Y_%m_%d_%H_%M_%S"))
         filename = filename.replace("%s", str(opts.sequence))
         out_file = open(filename, "wb")
-    if not snr_data or not snr_data[0]:
-        logging.error("Invalid SNR map data: Zero-length")
-        return 1
     writer = png.Writer(len(snr_data[0]),
                         len(snr_data),
                         alpha=(not opts.no_alpha),
@@ -204,6 +204,7 @@ def main():
 
     context = starlink_grpc.ChannelContext(target=opts.target)
 
+    rc = 0
     try:
         if opts.reset:
             starlink_grpc.reset_obstruction_map(context)
