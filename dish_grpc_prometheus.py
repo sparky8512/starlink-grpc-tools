@@ -11,6 +11,7 @@ import logging
 import signal
 import sys
 import threading
+import time
 
 import dish_common
 
@@ -239,6 +240,10 @@ def prometheus_export(opts, gstate):
     # use the timestamp from whichever data group was actually collected, so
     # that a history stats mode (e.g. ping_drop) can be exported on its own
     timestamp = status_ts if status_ts is not None else hist_ts
+    if timestamp is None:
+        # nothing was collected (e.g. the dish is unreachable), so the exporter's
+        # own metrics still need a timestamp
+        timestamp = int(time.time())
 
     metrics = []
 
