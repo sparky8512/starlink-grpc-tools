@@ -338,7 +338,7 @@ def history_stats(filename, parse_samples, verbose=False):
                     break
             result.append(value)
         result.append(data[-1][0])
-        accum_value += sum(x[0] for x in items)
+        accum_value += sum(x[0] * x[1] for x in items)
         return accum_value / total_weight, result
 
     bucket_samples = []
