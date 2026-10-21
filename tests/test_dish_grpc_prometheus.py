@@ -155,6 +155,41 @@ class TestDishGrpcPrometheus(unittest.TestCase):
         self.assertIn('starlink_info{id="ut01",hardware_version="rev4",software_version="abc"}',
                       output)
 
+    def test_history_mode_without_data_falls_back_to_current_time(self):
+        # When the dish is unreachable, a history stats mode reports no data and
+        # no timestamp. The export must still succeed (listing the missing
+        # metrics), like status mode does with DISH_UNREACHABLE, instead of
+        # raising and leaving the scraper with a dropped connection.
+        for mode, prefix in (("usage", "usage"), ("ping_drop", "ping_stats"), ("power", "power")):
+            with self.subTest(mode=mode):
+                self.opts.mode = [mode]
+
+                def fake_get_data(opts, gstate, add_item, add_sequence):
+                    return 1, None, None
+
+                with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+                    with mock.patch("dish_grpc_prometheus.time.time", return_value=3000.7):
+                        output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+                self.assertIn("starlink_exporter_missing_metrics", output)
+                self.assertRegex(
+                    output,
+                    r'starlink_exporter_missing_metrics\{metric="%s_\w+"\} 1 3000000' % prefix)
+
+    def test_reported_timestamp_is_preferred_over_current_time(self):
+        self.opts.mode = ["ping_drop"]
+
+        def fake_get_data(opts, gstate, add_item, add_sequence):
+            add_item("samples", 100, "ping_stats")
+            return 0, None, 2000
+
+        with mock.patch("dish_common.get_data", side_effect=fake_get_data):
+            with mock.patch("dish_grpc_prometheus.time.time", return_value=3000.7):
+                output = dish_grpc_prometheus.prometheus_export(self.opts, self.gstate)
+
+        self.assertIn("starlink_ping_stats_samples 100.0 2000000", output)
+        self.assertNotIn("3000000", output)
+
     def test_every_metric_belongs_to_a_mode(self):
         all_modes = [
             "status", "software_update_detail", "alert_detail", "usage", "location", "power",
