@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Unit tests for dish_obstruction_map.py"""
 
+import os
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -36,6 +38,34 @@ class TestDishObstructionMapMain(unittest.TestCase):
             code = self.run_main(["out.png"])
 
         self.assertEqual(code, 1)
+
+
+class TestDishObstructionMapLoopBody(unittest.TestCase):
+
+    def run_loop_body(self, snr_data, filename):
+        with mock.patch.object(sys, "argv", ["dish_obstruction_map.py", filename]):
+            opts = dish_obstruction_map.parse_args()
+        with mock.patch.object(starlink_grpc, "obstruction_map", return_value=snr_data):
+            return dish_obstruction_map.loop_body(opts, mock.Mock())
+
+    def test_empty_map_data_does_not_create_output_file(self):
+        for snr_data in ([], [[]]):
+            with self.subTest(snr_data=snr_data), tempfile.TemporaryDirectory() as tmpdir:
+                filename = os.path.join(tmpdir, "map.png")
+                with self.assertLogs(level="ERROR"):
+                    rc = self.run_loop_body(snr_data, filename)
+
+                self.assertEqual(rc, 1)
+                self.assertEqual(os.listdir(tmpdir), [])
+
+    def test_valid_map_data_writes_png_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "map.png")
+            rc = self.run_loop_body([[1.0, 0.0], [0.5, -1.0]], filename)
+
+            self.assertEqual(rc, 0)
+            with open(filename, "rb") as infile:
+                self.assertEqual(infile.read(8)[1:4], b"PNG")
 
 
 if __name__ == "__main__":
