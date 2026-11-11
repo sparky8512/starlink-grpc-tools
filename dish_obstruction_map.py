@@ -99,7 +99,11 @@ def loop_body(opts, context):
             "%d",
             datetime.fromtimestamp(now, timezone.utc).strftime("%Y_%m_%d_%H_%M_%S"))
         filename = filename.replace("%s", str(opts.sequence))
-        out_file = open(filename, "wb")
+        try:
+            out_file = open(filename, "wb")
+        except OSError as e:
+            logging.error("Failed opening output file: %s", str(e))
+            return 1
     writer = png.Writer(len(snr_data[0]),
                         len(snr_data),
                         alpha=(not opts.no_alpha),

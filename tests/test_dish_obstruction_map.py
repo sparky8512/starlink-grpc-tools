@@ -58,6 +58,14 @@ class TestDishObstructionMapLoopBody(unittest.TestCase):
                 self.assertEqual(rc, 1)
                 self.assertEqual(os.listdir(tmpdir), [])
 
+    def test_output_in_missing_directory_returns_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            filename = os.path.join(tmpdir, "no_such_dir", "map.png")
+            with self.assertLogs(level="ERROR"):
+                rc = self.run_loop_body([[1.0, 0.0], [0.5, -1.0]], filename)
+
+            self.assertEqual(rc, 1)
+
     def test_valid_map_data_writes_png_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             filename = os.path.join(tmpdir, "map.png")
