@@ -47,6 +47,10 @@ This group holds information about the current state of the user terminal.
     rebooted.
 : **snr** : Most recent sample value. See bulk history data for detail.
     **OBSOLETE**: The user terminal no longer provides this data.
+: **signal_quality** : Signal quality, reported as a value from 0.0 to 1.0, or
+    None if not reported by the user terminal. It appears to be the signal to
+    noise ratio in dB divided by 10, clamped to that range, so multiply by 10
+    to approximate SNR in dB.
 : **seconds_to_first_nonempty_slot** : Amount of time from now, in seconds,
     until a satellite will be scheduled to be available for transmit/receive.
     See also *scheduled* in the bulk history data. May report as a negative
@@ -487,6 +491,7 @@ StatusDict = TypedDict(
         "gps_enabled": Optional[bool],
         "gps_sats": Optional[int],
         "software_update_state": Optional[str],
+        "signal_quality": Optional[float],
     })
 
 SoftwareUpdateDict = TypedDict(
@@ -966,6 +971,7 @@ def status_data(
         "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
         "gps_sats": getattr(gps_stats, "gps_sats", None),
         "software_update_state": _enum_name(status, "software_update_state"),
+        "signal_quality": getattr(status, "signal_quality", None),
     }
     software_update_detail: SoftwareUpdateDict = {
         "software_update_progress": software_update_progress,

@@ -64,6 +64,7 @@ METRICS_INFO = {
     "status_obstruction_interval": MetricInfo(),
     "status_direction_azimuth": MetricInfo(),
     "status_direction_elevation": MetricInfo(),
+    "status_signal_quality": MetricInfo(),
     "status_is_snr_above_noise_floor": MetricInfo(),
     "status_alert_motors_stuck": MetricInfo(),
     "status_alert_thermal_throttle": MetricInfo(),
