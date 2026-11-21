@@ -473,7 +473,6 @@ StatusDict = TypedDict(
         "state": str,
         "uptime": Optional[int],
         "snr": Optional[float],
-        "signal_quality": Optional[float],
         "seconds_to_first_nonempty_slot": Optional[float],
         "pop_ping_drop_rate": Optional[float],
         "downlink_throughput_bps": Optional[float],
@@ -492,6 +491,7 @@ StatusDict = TypedDict(
         "gps_enabled": Optional[bool],
         "gps_sats": Optional[int],
         "software_update_state": Optional[str],
+        "signal_quality": Optional[float],
     })
 
 SoftwareUpdateDict = TypedDict(
@@ -953,7 +953,6 @@ def status_data(
         "state": state,
         "uptime": getattr(getattr(status, "device_state", None), "uptime_s", None),
         "snr": None,  # obsoleted in grpc service
-        "signal_quality": getattr(status, "signal_quality", None),
         "seconds_to_first_nonempty_slot": getattr(status, "seconds_to_first_nonempty_slot", None),
         "pop_ping_drop_rate": getattr(status, "pop_ping_drop_rate", None),
         "downlink_throughput_bps": getattr(status, "downlink_throughput_bps", None),
@@ -972,6 +971,7 @@ def status_data(
         "gps_enabled": None if inhibit_gps is None else not inhibit_gps,
         "gps_sats": getattr(gps_stats, "gps_sats", None),
         "software_update_state": _enum_name(status, "software_update_state"),
+        "signal_quality": getattr(status, "signal_quality", None),
     }
     software_update_detail: SoftwareUpdateDict = {
         "software_update_progress": software_update_progress,
