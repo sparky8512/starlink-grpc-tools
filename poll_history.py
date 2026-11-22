@@ -6,8 +6,8 @@ implement polling of status and/or history data.
 
 By itself, it's not very useful unless you're trying to understand how the
 status data correlates with certain aspects of the history data because all it
-does is to dump both status and history data when it detects certain
-conditions in the history data.
+does is to dump both status and history data when it detects a certain
+condition in the history data.
 """
 
 from datetime import datetime
@@ -44,11 +44,7 @@ def run_loop(context):
             # be replaced with something more useful.
 
             # This computes a trigger detecting any packet loss (ping drop):
-            #triggered = any(x > 0 for x in bulk["pop_ping_drop_rate"])
-            # This computes a trigger detecting samples marked as obstructed:
-            #triggered = any(bulk["obstructed"])
-            # This computes a trigger detecting samples not marked as scheduled:
-            triggered = not all(bulk["scheduled"])
+            triggered = any(x > 0 for x in bulk["pop_ping_drop_rate"])
             if triggered or prev_triggered:
                 print("Triggered" if triggered else "Continued", "at:",
                       datetime.now(tz=timezone.utc))
@@ -66,7 +62,7 @@ def run_loop(context):
         # And this is a not-very-robust way of implementing an interval loop.
         # Note that a 4 second loop will poll the history buffer pretty
         # frequently. Even though we only ask for new samples (which should
-        # only be 4 of them), the grpc layer needs to pull the entire 12 hour
+        # only be 4 of them), the grpc layer needs to pull the entire 15 minute
         # history buffer each time, only to discard most of it.
         time.sleep(LOOP_SLEEP_TIME)
 
@@ -80,6 +76,8 @@ def main():
 
     try:
         run_loop(context)
+    except KeyboardInterrupt:
+        pass
     finally:
         context.close()
 
