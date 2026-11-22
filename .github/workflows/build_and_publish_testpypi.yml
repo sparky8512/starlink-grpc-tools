@@ -1,0 +1,52 @@
+name: Build core module Python distribution package and publish to TestPyPI
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    name: Build distribution package
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+        fetch-depth: 0  # needed for setuptools-scm
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.x"
+    - name: Install pypa/build
+      run: python3 -m pip install build --user
+    - name: Build a wheel and a source distribution
+      run: python3 -m build
+      working-directory: ./packaging
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v7
+      with:
+        name: python-package-distributions
+        path: packaging/dist/
+
+  publish-to-testpypi:
+    name: Publish package to TestPyPI
+    needs:
+    - build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/starlink-grpc-core
+
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download the dist
+      uses: actions/download-artifact@v8
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish package to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
