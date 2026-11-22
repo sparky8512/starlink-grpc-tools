@@ -1566,25 +1566,31 @@ def history_stats(
         run_length = 0
 
     def weighted_mean_and_quantiles(data, n):
+        # compute weighted mean and quantile boundary values, including
+        # min and max values
+        #
+        # data is sequence of (value, weight) tuples, where weight > 0.0,
+        #     sorted by value
+        # n is number of quantiles
+        #
         if not data:
             return None, [None] * (n+1)
-        total_weight = sum(x[1] for x in data)
+        total_weight = sum(weight for value, weight in data)
         result = []
         items = iter(data)
         value, accum_weight = next(items)
         accum_value = value * accum_weight
-        for boundary in (total_weight * x / n for x in range(n)):
-            while accum_weight < boundary:
+        for x in range(n + 1):
+            boundary = total_weight * x / n
+            while accum_weight < boundary or x == n:
                 try:
                     value, weight = next(items)
                     accum_value += value * weight
                     accum_weight += weight
                 except StopIteration:
-                    # shouldn't happen, but in case of float precision weirdness...
+                    # make sure last bucket continues until end
                     break
             result.append(value)
-        result.append(data[-1][0])
-        accum_value += sum(x[0] * x[1] for x in items)
         return accum_value / total_weight, result
 
     bucket_samples: List[int] = []
