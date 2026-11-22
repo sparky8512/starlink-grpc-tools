@@ -947,6 +947,9 @@ def status_data(
         pass
 
     status_data_dict: StatusDict = {
+        # Note: add new values at end, dict order is used by the text output
+        # script for CSV
+
         "id": getattr(device_info, "id", None),
         "hardware_version": getattr(device_info, "hardware_version", None),
         "software_version": getattr(device_info, "software_version", None),
