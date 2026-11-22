@@ -25,7 +25,7 @@ jobs:
     - name: Install pypa/build
       run: python3 -m pip install build --user
     - name: Build a wheel and a source distribution
-      run: python3 -m build
+      run: python3 -m build --wheel
       working-directory: ./packaging
     - name: Store the distribution packages
       uses: actions/upload-artifact@v7
